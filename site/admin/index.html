@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <!-- include:head -->
+  <title>Admin | The Pinus Resort</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="/src/styles/admin.css">
+  <script type="module" src="/src/js/admin.js"></script>
+</head>
+<body class="admin">
+  <!-- include:icons -->
+  <div class="login-wrap" data-login-view hidden>
+    <form class="login-card" data-login>
+      <img src="/logo.png" alt="The Pinus Resort" width="269" height="269">
+      <h1>Staff sign in</h1>
+      <label class="f"><span>Email</span><input class="inp" name="email" type="email" autocomplete="username" required></label>
+      <label class="f"><span>Password</span><input class="inp" name="password" type="password" autocomplete="current-password" required></label>
+      <div class="note-box bad" data-login-error hidden></div>
+      <button class="b b--primary" type="submit">Sign in</button>
+    </form>
+  </div>
+
+  <div class="ad" data-app hidden>
+    <aside class="ad-side">
+      <div class="ad-brand"><img src="/logo-cream-emblem.png" alt="" width="47" height="38">The Pinus</div>
+      <nav class="ad-nav" aria-label="Admin" data-nav></nav>
+      <div class="ad-mobile-user"><span data-user-name></span><button type="button" data-pw>Password</button><button type="button" data-logout>Sign out</button></div>
+      <div class="ad-user"><b data-user-name></b><span data-user-role></span><br><button type="button" data-pw>Change password</button><button type="button" data-logout>Sign out</button></div>
+    </aside>
+    <main class="ad-main" id="main" data-view></main>
+  </div>
+
+  <dialog class="dlg" data-dialog></dialog>
+  <div class="toast" role="status" aria-live="polite" data-toast></div>
+</body>
+</html>

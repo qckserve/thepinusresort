@@ -1,0 +1,28 @@
+{
+  "name": "thepinus",
+  "private": true,
+  "version": "1.0.0",
+  "description": "The Pinus Resort, Pahalgam: website (Vite) and booking enquiry backend (Node.js)",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n web,api -c green,blue \"vite --port 5173 --strictPort\" \"npm:dev:api\"",
+    "dev:api": "PORT=8787 node --watch --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/index.js",
+    "build": "vite build",
+    "preview": "npm run build && npm start",
+    "start": "NODE_ENV=production node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/index.js"
+  },
+  "dependencies": {
+    "compression": "^1.8.2",
+    "express": "^5.3.0",
+    "nodemailer": "^10.3.1"
+  },
+  "devDependencies": {
+    "@fontsource/cormorant-garamond": "^5.3.0",
+    "@fontsource/jost": "^5.3.0",
+    "concurrently": "^10.0.6",
+    "vite": "^8.3.6"
+  }
+}

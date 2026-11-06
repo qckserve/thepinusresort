@@ -1,0 +1,249 @@
+{
+ "cottages-wide": {
+  "w": 4000,
+  "h": 3000,
+  "sizes": [
+   640,
+   1280,
+   1920,
+   2560
+  ]
+ },
+ "cottages-front": {
+  "w": 4000,
+  "h": 3000,
+  "sizes": [
+   640,
+   1280,
+   1920,
+   2560
+  ]
+ },
+ "cottages-pine": {
+  "w": 3000,
+  "h": 4000,
+  "sizes": [
+   640,
+   1280
+  ]
+ },
+ "cottages-lawn": {
+  "w": 6120,
+  "h": 8160,
+  "sizes": [
+   640,
+   1280
+  ]
+ },
+ "cottage-through-pines": {
+  "w": 6120,
+  "h": 8160,
+  "sizes": [
+   640,
+   1280
+  ]
+ },
+ "cottage-pine-branch": {
+  "w": 8160,
+  "h": 6120,
+  "sizes": [
+   640,
+   1280,
+   1920,
+   2560
+  ]
+ },
+ "lawn-mountain-view": {
+  "w": 627,
+  "h": 470,
+  "sizes": [
+   640
+  ]
+ },
+ "grounds-mountain-view": {
+  "w": 733,
+  "h": 550,
+  "sizes": [
+   640,
+   1280
+  ]
+ },
+ "cottages-green-lawn": {
+  "w": 733,
+  "h": 550,
+  "sizes": [
+   640,
+   1280
+  ]
+ },
+ "bathroom-shower": {
+  "w": 733,
+  "h": 550,
+  "sizes": [
+   640,
+   1280
+  ]
+ },
+ "bathroom-vanity": {
+  "w": 848,
+  "h": 478,
+  "sizes": [
+   640,
+   1280
+  ]
+ },
+ "bathroom-basin": {
+  "w": 848,
+  "h": 478,
+  "sizes": [
+   640,
+   1280
+  ]
+ },
+ "room-deluxe-1": {
+  "w": 1200,
+  "h": 1600,
+  "sizes": [
+   640,
+   1280
+  ]
+ },
+ "room-bed": {
+  "w": 1200,
+  "h": 1600,
+  "sizes": [
+   640,
+   1280
+  ]
+ },
+ "room-deluxe-2": {
+  "w": 1200,
+  "h": 1600,
+  "sizes": [
+   640,
+   1280
+  ]
+ },
+ "room-deluxe-3": {
+  "w": 1200,
+  "h": 1600,
+  "sizes": [
+   640,
+   1280
+  ]
+ },
+ "room-deluxe-4": {
+  "w": 1200,
+  "h": 1600,
+  "sizes": [
+   640,
+   1280
+  ]
+ },
+ "lounge-1": {
+  "w": 1200,
+  "h": 1600,
+  "sizes": [
+   640,
+   1280
+  ]
+ },
+ "lounge-2": {
+  "w": 1200,
+  "h": 1600,
+  "sizes": [
+   640,
+   1280
+  ]
+ },
+ "area-pahalgam-dusk": {
+  "w": 3840,
+  "h": 2090,
+  "sizes": [
+   640,
+   1280,
+   1920
+  ]
+ },
+ "area-betaab-valley": {
+  "w": 3840,
+  "h": 2560,
+  "sizes": [
+   640,
+   1280,
+   1920
+  ]
+ },
+ "area-aru-valley": {
+  "w": 3840,
+  "h": 2880,
+  "sizes": [
+   640,
+   1280,
+   1920
+  ]
+ },
+ "area-ponies-meadow": {
+  "w": 3840,
+  "h": 1770,
+  "sizes": [
+   640,
+   1280,
+   1920
+  ]
+ },
+ "area-pahalgam-valley": {
+  "w": 3840,
+  "h": 2142,
+  "sizes": [
+   640,
+   1280,
+   1920
+  ]
+ },
+ "area-lidder-river-peaks": {
+  "w": 3840,
+  "h": 2560,
+  "sizes": [
+   640,
+   1280,
+   1920
+  ]
+ },
+ "area-lidder-river-pines": {
+  "w": 3840,
+  "h": 2560,
+  "sizes": [
+   640,
+   1280,
+   1920
+  ]
+ },
+ "area-betaab-valley-winter": {
+  "w": 3840,
+  "h": 2880,
+  "sizes": [
+   640,
+   1280,
+   1920
+  ]
+ },
+ "area-lidder-trout": {
+  "w": 2832,
+  "h": 2128,
+  "sizes": [
+   640,
+   1280,
+   1920
+  ]
+ },
+ "area-aru-winter": {
+  "w": 3648,
+  "h": 2736,
+  "sizes": [
+   640,
+   1280,
+   1920
+  ]
+ }
+}

@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /review/
+
+Sitemap: https://thepinusresort.com/sitemap.xml

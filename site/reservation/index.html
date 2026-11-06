@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <!-- include:head -->
+  <title>Reservation | Book your stay at The Pinus Resort, Pahalgam</title>
+  <meta name="description" content="Send your dates to The Pinus Resort, Nunwan, Pahalgam. Tell us when you arrive, how many guests and rooms, and we will call or WhatsApp you with availability and rates.">
+  <link rel="canonical" href="{{site.url}}/reservation/">
+  <meta property="og:title" content="Book your stay at The Pinus Resort">
+  <meta property="og:description" content="Send your dates and we reply with availability and rates.">
+  <meta property="og:url" content="{{site.url}}/reservation/">
+  <meta property="og:image" content="{{site.url}}/og/reservation.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <script type="module" src="/src/js/enquiry.js"></script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://thepinusresort.com/"}, {"@type": "ListItem", "position": 2, "name": "Reservation", "item": "https://thepinusresort.com/reservation/"}]}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebPage", "url": "https://thepinusresort.com/reservation/", "name": "Book your stay at The Pinus Resort", "about": {"@type": "Resort", "name": "The Pinus Resort", "url": "https://thepinusresort.com/"}, "potentialAction": {"@type": "ReserveAction", "target": "https://thepinusresort.com/reservation/", "object": {"@type": "Resort", "name": "The Pinus Resort", "url": "https://thepinusresort.com/"}}}</script>
+</head>
+<body>
+  <!-- include:header nav=reservation -->
+  <main id="main">
+    <section class="page-hero">
+      <div class="page-hero__media"><img data-img="cottage-pine-branch" alt="A Pinus cottage seen through pine branches" loading="eager" fetchpriority="high"></div>
+      <div class="container page-hero__inner" style="min-height:clamp(320px,42vh,440px)">
+        <p class="eyebrow">Reservation</p>
+        <h1 class="h1">Book your stay</h1>
+        <p class="page-hero__sub">Secure your getaway at our peaceful, homely cottages.</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container reserve">
+        <div class="panel" data-enquiry-wrap>
+          <form class="form" data-enquiry="booking" novalidate>
+            <div class="full stack" style="--stack:10px">
+              <p class="eyebrow">Step 1 &middot; Your stay</p>
+              <h2 class="h3">When are you coming?</h2>
+            </div>
+            <div class="field">
+              <label for="r-in">Check in</label>
+              <input id="r-in" name="checkIn" type="date" required>
+              <span class="field__error" data-error="checkIn"></span>
+            </div>
+            <div class="field">
+              <label for="r-out">Check out</label>
+              <input id="r-out" name="checkOut" type="date" required>
+              <span class="field__error" data-error="checkOut"></span>
+            </div>
+            <div class="field">
+              <label for="r-adults">Adults</label>
+              <div class="stepper">
+                <button type="button" data-step="-1" aria-label="One adult fewer"><svg class="icon"><use href="#i-minus"/></svg></button>
+                <input id="r-adults" name="adults" type="number" inputmode="numeric" min="1" max="40" value="2" required>
+                <button type="button" data-step="1" aria-label="One adult more"><svg class="icon"><use href="#i-plus"/></svg></button>
+              </div>
+              <span class="field__error" data-error="adults"></span>
+            </div>
+            <div class="field">
+              <label for="r-children">Children <span style="text-transform:none;letter-spacing:0">(under 12)</span></label>
+              <div class="stepper">
+                <button type="button" data-step="-1" aria-label="One child fewer"><svg class="icon"><use href="#i-minus"/></svg></button>
+                <input id="r-children" name="children" type="number" inputmode="numeric" min="0" max="20" value="0">
+                <button type="button" data-step="1" aria-label="One child more"><svg class="icon"><use href="#i-plus"/></svg></button>
+              </div>
+              <span class="field__error" data-error="children"></span>
+            </div>
+            <div class="field">
+              <label for="r-rooms">Rooms</label>
+              <div class="stepper">
+                <button type="button" data-step="-1" aria-label="One room fewer"><svg class="icon"><use href="#i-minus"/></svg></button>
+                <input id="r-rooms" name="rooms" type="number" inputmode="numeric" min="1" max="20" value="1" required>
+                <button type="button" data-step="1" aria-label="One room more"><svg class="icon"><use href="#i-plus"/></svg></button>
+              </div>
+              <span class="field__error" data-error="rooms"></span>
+            </div>
+            <div class="field">
+              <label for="r-room">Room preference</label>
+              <select id="r-room" name="roomType">
+                <option>Deluxe Room</option>
+                <option selected>Not sure yet</option>
+              </select>
+            </div>
+
+            <div class="full stack mt-s" style="--stack:10px">
+              <p class="eyebrow">Step 2 &middot; Your details</p>
+              <h2 class="h3">How do we reach you?</h2>
+            </div>
+            <div class="field full">
+              <label for="r-name">Full name</label>
+              <input id="r-name" name="name" type="text" autocomplete="name" required maxlength="120">
+              <span class="field__error" data-error="name"></span>
+            </div>
+            <div class="field">
+              <label for="r-phone">Mobile / WhatsApp</label>
+              <input id="r-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+91 98765 43210" required maxlength="30">
+              <span class="field__error" data-error="phone"></span>
+            </div>
+            <div class="field">
+              <label for="r-email">Email <span style="text-transform:none;letter-spacing:0">(for your confirmation)</span></label>
+              <input id="r-email" name="email" type="email" autocomplete="email" inputmode="email" required maxlength="160">
+              <span class="field__error" data-error="email"></span>
+            </div>
+            <div class="field full">
+              <label for="r-msg">Anything we should know? <span style="text-transform:none;letter-spacing:0">(optional)</span></label>
+              <textarea id="r-msg" name="message" maxlength="2000" placeholder="Arrival time, special occasions, meal preferences, help with a taxi..."></textarea>
+            </div>
+            <div class="hp" aria-hidden="true"><label for="r-web">Website</label><input id="r-web" name="website" tabindex="-1" autocomplete="off"></div>
+
+            <div class="full form-status" role="alert" data-status hidden></div>
+            <div class="full btn-row">
+              <button class="btn" type="submit" data-submit>Send enquiry</button>
+              <p class="form-note">No payment now. We confirm by call or WhatsApp.</p>
+            </div>
+          </form>
+        </div>
+
+        <aside class="reserve__aside stack" style="--stack:16px">
+          <div class="panel panel--dark on-dark">
+            <p class="eyebrow">Your stay</p>
+            <dl class="summary mt-m" data-summary>
+              <div><dt>Check in</dt><dd data-sum="in">Choose a date</dd></div>
+              <div><dt>Check out</dt><dd data-sum="out">Choose a date</dd></div>
+              <div><dt>Nights</dt><dd data-sum="nights">&ndash;</dd></div>
+              <div><dt>Guests</dt><dd data-sum="guests">2 adults</dd></div>
+              <div><dt>Rooms</dt><dd data-sum="rooms">1</dd></div>
+            </dl>
+            <ol class="steps mt-l" role="list">
+              <li><span><b>Send your dates</b>It takes a minute and costs nothing.</span></li>
+              <li><span><b>We get back to you</b>By phone or WhatsApp, with availability and the rate.</span></li>
+              <li><span><b>Confirm and relax</b>Once you confirm, your cottage is ready and waiting.</span></li>
+            </ol>
+          </div>
+          <div class="panel">
+            <p class="eyebrow">Good to know</p>
+            <dl class="policies policies--stack mt-s">
+              <div><dt>Check in</dt><dd>From 2:00 pm</dd></div>
+              <div><dt>Check out</dt><dd>By 12:00 noon</dd></div>
+              <div><dt>Breakfast</dt><dd>Continental, Asian or buffet</dd></div>
+              <div><dt>Parking</dt><dd>Free, on site</dd></div>
+              <div><dt>Children</dt><dd>Welcome; no extra beds or cots</dd></div>
+              <div><dt>Pets</dt><dd>Not allowed</dd></div>
+            </dl>
+          </div>
+          <div class="panel stack" style="--stack:12px">
+            <p class="eyebrow">Prefer to talk?</p>
+            <a class="btn btn--ghost btn--block" href="tel:{{site.phoneHref}}"><svg class="icon"><use href="#i-phone"/></svg>{{site.phone}}</a>
+            <a class="btn btn--block" href="https://wa.me/{{site.whatsapp}}" target="_blank" rel="noopener" data-wa><svg class="icon"><use href="#i-whatsapp"/></svg>WhatsApp us</a>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+  <!-- include:footer -->
+  <template id="tpl-success">
+    <div class="success stack" tabindex="-1">
+      <svg class="icon"><use href="#i-check-circle"/></svg>
+      <p class="eyebrow">Enquiry received</p>
+      <h2 class="h2">Thank you, <span data-s="name"></span></h2>
+      <p class="lede center">We will call or WhatsApp you on <b data-s="phone"></b> shortly with availability and rates. Your reference:</p>
+      <span class="ref" data-s="ref"></span>
+      <div class="btn-row mt-m" style="justify-content:center">
+        <a class="btn" data-s="wa" target="_blank" rel="noopener"><svg class="icon"><use href="#i-whatsapp"/></svg>Continue on WhatsApp</a>
+        <a class="link-u" href="/">Back to home</a>
+      </div>
+    </div>
+  </template>
+</body>
+</html>

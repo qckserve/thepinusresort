@@ -1,0 +1,54 @@
+<footer class="footer on-dark">
+  <div class="container footer__top">
+    <div class="footer__brand">
+      <img src="/logo-cream.png" alt="The Pinus Resort" width="269" height="269" loading="lazy">
+      <p>Pine-wood cottages on the edge of Pahalgam, with the Lidder river and the snow peaks for neighbours.</p>
+      <div class="socials">
+        <a href="{{site.instagram}}" target="_blank" rel="noopener" aria-label="Instagram"><svg class="icon"><use href="#i-instagram"/></svg></a>
+        <a href="https://wa.me/{{site.whatsapp}}" target="_blank" rel="noopener" aria-label="WhatsApp" data-wa><svg class="icon"><use href="#i-whatsapp"/></svg></a>
+        <a href="mailto:{{site.email}}" aria-label="Email"><svg class="icon"><use href="#i-mail"/></svg></a>
+      </div>
+    </div>
+    <div>
+      <h2>The Resort</h2>
+      <ul role="list">
+        <li><a href="/about/">About us</a></li>
+        <li><a href="/accommodation/">Accommodation</a></li>
+        <li><a href="/accommodation/deluxe-room/">Deluxe Room</a></li>
+        <li><a href="/gallery/">Gallery</a></li>
+      </ul>
+    </div>
+    <div>
+      <h2>Plan</h2>
+      <ul role="list">
+        <li><a href="/reservation/">Reservation</a></li>
+        <li><a href="/activities/">Experiences</a></li>
+        <li><a href="/contact/#getting-here">Getting here</a></li>
+        <li><a href="/contact/">Contact</a></li>
+      </ul>
+    </div>
+    <div>
+      <h2>Contact</h2>
+      <ul role="list" class="footer__contact">
+        <li><svg class="icon"><use href="#i-pin"/></svg><a href="{{site.mapsUrl}}" target="_blank" rel="noopener">The Pinus Resort, Nunwan, Pahalgam,<br>opp. Yatra frisking point, {{site.postalCode}}</a></li>
+        <li><svg class="icon"><use href="#i-phone"/></svg><a href="tel:{{site.phoneHref}}">{{site.phone}}</a></li>
+        <li><svg class="icon"><use href="#i-mail"/></svg><a href="mailto:{{site.email}}">{{site.email}}</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="container footer__bottom">
+    <span>&copy; {{year}} The Pinus Resort, Pahalgam. All rights reserved.</span>
+    <nav aria-label="Footer">
+      <a href="/photo-credits/">Photo credits</a>
+      <a href="/sitemap.xml">Sitemap</a>
+    </nav>
+  </div>
+</footer>
+<a class="wa-float" href="https://wa.me/{{site.whatsapp}}" target="_blank" rel="noopener" aria-label="Chat with us on WhatsApp" data-wa><svg class="icon"><use href="#i-whatsapp"/></svg></a>
+<div class="lightbox" role="dialog" aria-modal="true" aria-label="Photo viewer" data-lightbox>
+  <button class="lightbox__close" type="button" aria-label="Close" data-lb-close><svg class="icon"><use href="#i-close"/></svg></button>
+  <button class="lightbox__nav lightbox__nav--prev" type="button" aria-label="Previous photo" data-lb-prev><svg class="icon"><use href="#i-left"/></svg></button>
+  <img alt="" data-lb-img>
+  <button class="lightbox__nav lightbox__nav--next" type="button" aria-label="Next photo" data-lb-next><svg class="icon"><use href="#i-right"/></svg></button>
+  <p class="lightbox__cap" data-lb-cap></p>
+</div>
