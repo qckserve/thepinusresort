@@ -7,7 +7,7 @@
 // "skipped" and everything else keeps working.
 import nodemailer from 'nodemailer';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { one, run, getSettings } from './db.js';
+import { col, nowIso, getSettings } from './db.js';
 import { niceDate, daysBetween } from './dates.js';
 import { MEAL_PLANS } from './inventory.js';
 import { site } from './site.js';
@@ -32,8 +32,8 @@ const time12 = (hhmm) => {
   return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`;
 };
 
-export function adminRecipients() {
-  return (getSettings().notify_email || MAIL_TO || site.email).split(',').map((s) => s.trim()).filter(Boolean);
+export async function adminRecipients() {
+  return ((await getSettings()).notify_email || MAIL_TO || site.email).split(',').map((s) => s.trim()).filter(Boolean);
 }
 
 /* ---------- Layout ---------- */
@@ -83,15 +83,13 @@ async function send({ kind, to, subject, html, text, reservationId = null, enqui
       console.error(`[mail] ${kind} to ${recipients.join(', ')} failed: ${error}`);
     }
   }
-  run('INSERT INTO email_log (kind, reservation_id, enquiry_id, recipient, subject, status, error) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    kind, reservationId, enquiryId, recipients.join(', '), subject, status, error);
+  await col('email_log').insertOne({ kind, reservation_id: reservationId, enquiry_id: enquiryId, recipient: recipients.join(', '), subject, status, error, created_at: nowIso() });
   return status;
 }
 
 /* ---------- Booking details shared by all reservation emails ---------- */
-function stayRows(r, { money = true } = {}) {
+function stayRows(r, s, { money = true } = {}) {
   const n = daysBetween(r.check_in, r.check_out);
-  const s = getSettings();
   return [
     ['Booking reference', r.reference],
     ['Guest', r.guest_name],
@@ -103,13 +101,17 @@ function stayRows(r, { money = true } = {}) {
     ...(money ? [['Total', inr(r.amount_minor)], ['Advance received', inr(r.advance_minor)], ['Balance', r.amount_minor != null && r.advance_minor != null ? inr(r.amount_minor - r.advance_minor) : '']] : []),
   ];
 }
-function loadRes(id) {
-  return one(`SELECT r.*, rt.name AS room_name, rp.meal_plan FROM reservations r JOIN room_types rt ON rt.id = r.room_type_id LEFT JOIN rate_plans rp ON rp.id = r.rate_plan_id WHERE r.id = ?`, id);
+async function loadRes(id) {
+  const r = await col('reservations').findOne({ _id: id });
+  if (!r) return null;
+  const [rt, rp] = await Promise.all([col('room_types').findOne({ _id: r.room_type_id }), r.rate_plan_id ? col('rate_plans').findOne({ _id: r.rate_plan_id }) : null]);
+  return { ...r, id: r._id, room_name: rt?.name ?? '', meal_plan: rp?.meal_plan ?? null };
 }
 const firstName = (n) => String(n).split(' ')[0];
 
 /* ---------- 1. Booking request received (website lead) ---------- */
 export async function sendLeadEmails(e) {
+  const admins = await adminRecipients();
   const isBooking = e.kind !== 'contact';
   const rows = [
     ['Request reference', e.ref],
@@ -129,7 +131,7 @@ export async function sendLeadEmails(e) {
   const jobs = [
     send({
       kind: 'lead_admin',
-      to: adminRecipients(),
+      to: admins,
       replyTo: e.email || undefined,
       enquiryId: e.id,
       subject: `New ${isBooking ? 'booking request' : 'message'} ${e.ref}: ${e.name}${isBooking ? `, ${niceDate(e.check_in, { weekday: undefined })}` : ''}`,
@@ -150,7 +152,7 @@ export async function sendLeadEmails(e) {
     jobs.push(send({
       kind: 'lead_guest',
       to: e.email,
-      replyTo: adminRecipients()[0],
+      replyTo: admins[0],
       enquiryId: e.id,
       subject: isBooking ? `We have your booking request (${e.ref}) | The Pinus Resort` : `We have your message (${e.ref}) | The Pinus Resort`,
       html: layout({
@@ -171,12 +173,13 @@ export async function sendLeadEmails(e) {
 
 /* ---------- 2. Booking confirmed ---------- */
 export async function sendConfirmation(reservationId) {
-  const r = loadRes(reservationId);
-  if (!r) return;
-  const rows = stayRows(r);
+  const r = await loadRes(reservationId);
+  if (!r) return [];
+  const [admins, s] = await Promise.all([adminRecipients(), getSettings()]);
+  const rows = stayRows(r, s);
   const jobs = [
     send({
-      kind: 'confirm_admin', to: adminRecipients(), reservationId,
+      kind: 'confirm_admin', to: admins, reservationId,
       subject: `Booking confirmed ${r.reference}: ${r.guest_name}, ${niceDate(r.check_in, { weekday: undefined })}`,
       html: layout({ preheader: `${r.rooms} x ${r.room_name} for ${r.guest_name}`, eyebrow: 'Booking confirmed', title: r.guest_name, intro: `<p>This booking is confirmed and the rooms are blocked in inventory.${r.guest_email ? ' The guest has been sent a confirmation email.' : ' <b>The guest has no email address on file</b>, so please share the confirmation by WhatsApp.'}</p>`, rows: [...rows, ['Phone', r.guest_phone], ['Email', r.guest_email], ['Notes', r.notes]], button: { href: `${BASE}/admin/`, label: 'Open admin panel' } }),
       text: textOf(`Booking confirmed: ${r.reference}`, rows),
@@ -184,7 +187,7 @@ export async function sendConfirmation(reservationId) {
   ];
   if (r.guest_email) {
     jobs.push(send({
-      kind: 'confirm_guest', to: r.guest_email, replyTo: adminRecipients()[0], reservationId,
+      kind: 'confirm_guest', to: r.guest_email, replyTo: admins[0], reservationId,
       subject: `Your booking is confirmed (${r.reference}) | The Pinus Resort`,
       html: layout({
         preheader: `See you on ${niceDate(r.check_in)}`,
@@ -198,18 +201,18 @@ export async function sendConfirmation(reservationId) {
       text: textOf(`Your booking is confirmed: ${r.reference}`, rows, `Directions: ${site.mapsUrl}`),
     }));
   }
-  await Promise.all(jobs);
+  return Promise.all(jobs);
 }
 
 /* ---------- 3. Day before check-out ---------- */
 export async function sendPreCheckout(reservationId) {
-  const r = loadRes(reservationId);
+  const r = await loadRes(reservationId);
   if (!r) return [];
-  const s = getSettings();
-  const rows = stayRows(r);
+  const [admins, s] = await Promise.all([adminRecipients(), getSettings()]);
+  const rows = stayRows(r, s);
   const jobs = [
     send({
-      kind: 'precheckout_admin', to: adminRecipients(), reservationId,
+      kind: 'precheckout_admin', to: admins, reservationId,
       subject: `Check-out tomorrow: ${r.guest_name} (${r.reference})`,
       html: layout({ preheader: 'Prepare the bill and room inspection', eyebrow: 'Check-out tomorrow', title: r.guest_name, intro: `<p>${esc(r.guest_name)} checks out tomorrow, ${esc(niceDate(r.check_out))}. Please have the final bill ready${r.amount_minor != null && r.advance_minor != null ? ` (balance ${esc(inr(r.amount_minor - r.advance_minor))})` : ''}.</p>`, rows: [...rows, ['Phone', r.guest_phone]] }),
       text: textOf(`Check-out tomorrow: ${r.guest_name}`, rows),
@@ -217,7 +220,7 @@ export async function sendPreCheckout(reservationId) {
   ];
   if (r.guest_email) {
     jobs.push(send({
-      kind: 'precheckout_guest', to: r.guest_email, replyTo: adminRecipients()[0], reservationId,
+      kind: 'precheckout_guest', to: r.guest_email, replyTo: admins[0], reservationId,
       subject: `Your check-out tomorrow | The Pinus Resort`,
       html: layout({
         preheader: `Check-out on ${niceDate(r.check_out)}`,
@@ -235,13 +238,14 @@ export async function sendPreCheckout(reservationId) {
 
 /* ---------- 4. After check-out: review request ---------- */
 export async function sendReviewRequest(reservationId) {
-  const r = loadRes(reservationId);
+  const r = await loadRes(reservationId);
   if (!r) return [];
+  const admins = await adminRecipients();
   const link = `${BASE}/review/?t=${encodeURIComponent(r.review_token)}`;
   const jobs = [];
   if (r.guest_email) {
     jobs.push(send({
-      kind: 'review_guest', to: r.guest_email, replyTo: adminRecipients()[0], reservationId,
+      kind: 'review_guest', to: r.guest_email, replyTo: admins[0], reservationId,
       subject: `How was your stay, ${firstName(r.guest_name)}? | The Pinus Resort`,
       html: layout({
         preheader: 'One minute, five stars, a few words',
@@ -255,7 +259,7 @@ export async function sendReviewRequest(reservationId) {
     }));
   }
   jobs.push(send({
-    kind: 'review_admin', to: adminRecipients(), reservationId,
+    kind: 'review_admin', to: admins, reservationId,
     subject: `Review request ${r.guest_email ? 'sent to' : 'could not be emailed to'} ${r.guest_name} (${r.reference})`,
     html: layout({
       eyebrow: 'After check-out', title: r.guest_name,

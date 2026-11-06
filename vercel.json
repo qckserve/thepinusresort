@@ -1,0 +1,142 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/accomodation",
+      "destination": "/accommodation/",
+      "permanent": true
+    },
+    {
+      "source": "/accomodation/",
+      "destination": "/accommodation/",
+      "permanent": true
+    },
+    {
+      "source": "/home",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/home/",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/about",
+      "destination": "/about/",
+      "permanent": true
+    },
+    {
+      "source": "/accommodation",
+      "destination": "/accommodation/",
+      "permanent": true
+    },
+    {
+      "source": "/accommodation/deluxe-room",
+      "destination": "/accommodation/deluxe-room/",
+      "permanent": true
+    },
+    {
+      "source": "/activities",
+      "destination": "/activities/",
+      "permanent": true
+    },
+    {
+      "source": "/gallery",
+      "destination": "/gallery/",
+      "permanent": true
+    },
+    {
+      "source": "/reservation",
+      "destination": "/reservation/",
+      "permanent": true
+    },
+    {
+      "source": "/contact",
+      "destination": "/contact/",
+      "permanent": true
+    },
+    {
+      "source": "/photo-credits",
+      "destination": "/photo-credits/",
+      "permanent": true
+    },
+    {
+      "source": "/review",
+      "destination": "/review/",
+      "permanent": true
+    },
+    {
+      "source": "/admin",
+      "destination": "/admin/",
+      "permanent": true
+    }
+  ],
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/images/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=2592000"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        }
+      ]
+    },
+    {
+      "source": "/admin/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron",
+      "schedule": "30 4 * * *"
+    }
+  ],
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 60
+    }
+  }
+}

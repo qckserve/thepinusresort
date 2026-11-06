@@ -6,22 +6,29 @@ New website for [thepinusresort.com](https://thepinusresort.com): a fast multi-p
 
 ```bash
 npm install
-cp .env.example .env   # then set ADMIN_PASSWORD and SESSION_SECRET
-npm run dev            # site on http://localhost:5173, API on :8787
+cp .env.example .env   # set ADMIN_PASSWORD and SESSION_SECRET; leave MONGODB_URI empty
+npm run dev            # local MongoDB on :27027, site on :5173, API on :8787
+npm test               # end-to-end API tests against a throwaway MongoDB
 ```
 
-Admin panel: http://localhost:5173/admin/. On first start an owner account is created from `ADMIN_EMAIL` + `ADMIN_PASSWORD` in `.env`; add other staff inside the admin.
+`npm run dev` starts a local one-node MongoDB replica set (data in `data/mongo/`, ignored by git). The first run downloads the MongoDB binary once. Admin panel: http://localhost:5173/admin/. On the first admin request an owner account is created from `ADMIN_EMAIL` + `ADMIN_PASSWORD`; add other staff inside the admin.
 
-## Production
+## Deploy on Vercel
+
+1. Import `qckserve/thepinusresort` in Vercel. `vercel.json` sets everything: Vite builds the site into `dist/`, `/api/*` runs `api/index.js` (the Express app as one function), old WordPress URLs redirect, and a daily cron calls `/api/cron` at 10:00 India time.
+2. In MongoDB Atlas: **Network Access** > allow `0.0.0.0/0` (Vercel has no fixed IPs), and copy the connection string from **Connect > Drivers**.
+3. In Vercel > Settings > Environment Variables, add: `MONGODB_URI`, `MONGODB_DB`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SESSION_SECRET`, `CRON_SECRET`, `PUBLIC_URL`, and the `SMTP_*` / `MAIL_*` values.
+4. Deploy, open `/admin/`, sign in, set the room count and rates.
+
+On the Hobby plan Vercel Cron runs once a day, so "check-out tomorrow" emails go at 10:00 and review requests the morning after check-out (or straight away when the desk marks a guest checked out). For more frequent runs, point a free cron service (e.g. cron-job.org) at `https://<site>/api/cron` with header `Authorization: Bearer <CRON_SECRET>`.
+
+## Deploy on a Node host (alternative)
 
 ```bash
-npm run build          # outputs dist/
-npm start              # serves dist/ + /api from one Node process on $PORT
+npm run build && npm start   # serves dist/ + /api from one process on $PORT, jobs every 10 min
 ```
 
-Needs Node 22.13 or newer (Node 24 recommended). Any Node host works (Hostinger Node.js app, a VPS with pm2, Render, Railway). Set the variables from `.env.example` in the host's panel. The SQLite file lives in `data/pinus.db` by default; point `DB_FILE` somewhere persistent if the host wipes the app folder on deploy.
-
-Old WordPress links keep working: `/about`, `/accomodation` (old misspelling) and other paths without a trailing slash redirect with a 301.
+Needs Node 22.13+ and the same environment variables.
 
 ## Where things live
 
@@ -34,11 +41,15 @@ Old WordPress links keep working: `/about`, `/accomodation` (old misspelling) an
 | `data/site.json` | Phone, WhatsApp, email, address, map pin. Change them here once; every page and email updates |
 | `data/images.json` | Size list for every photo. `<img data-img="room-deluxe-1">` expands to a full responsive `srcset` at build |
 | `public/images/` | Photos as WebP at 640/1280/1920/2560 px |
-| `server/` | Express app: `routes/api.js` (enquiries + admin), `lib/db.js` (SQLite), `lib/mail.js` (SMTP), `lib/auth.js` |
+| `server/` | `app.js` (Express app), `index.js` (Node server), `routes/api.js`, `lib/db.js` (MongoDB), `lib/inventory.js`, `lib/reservations.js`, `lib/mail.js`, `lib/auth.js`, `lib/scheduler.js` |
+| `api/index.js` | Vercel function entry (exports the Express app) |
+| `vercel.json` | Vercel build, rewrites, redirects, headers, cron |
+| `scripts/dev-mongo.mjs` | Local MongoDB replica set for development |
+| `test/api.test.mjs` | End-to-end API tests (`npm test`) |
 
 ## Admin and inventory (`/admin/`)
 
-Ported from `~/Downloads/hotelinventorysystem` (the hotelier extranet part), rewritten for one property on SQLite:
+Ported from `~/Downloads/hotelinventorysystem` (the hotelier extranet part), rewritten for one property on MongoDB:
 
 | Tab | What it does | Who |
 | --- | --- | --- |
@@ -65,9 +76,9 @@ Left out for now (one resort, no online payment yet): B2B supplier pulls, channe
 | Day before check-out (from 10 am) | Check-out reminder | "Check-out tomorrow" with balance |
 | After check-out | Review request linking to `/review/?t=...` | Copy with the link (so it can go on WhatsApp if the guest has no email) |
 
-The timed emails run inside the server every 10 minutes, only between 9 am and 9 pm India time, and each is claimed in the database before sending, so a restart or a second server process never sends twice. Guests who rate 4 or 5 stars are invited to post on Google (set the link in Rooms and rates).
+Timed emails only go out between 9 am and 9 pm India time, and each is claimed in the database before sending, so retries or parallel instances never send twice. Guests who rate 4 or 5 stars are invited to post on Google (set the link in Rooms and rates).
 
-Set `SMTP_*` in `.env` to send real email. For local testing, `MAIL_PREVIEW_DIR=/some/folder` writes every email as an `.html` file instead.
+The timed emails run from Vercel Cron (or every 10 minutes on a Node host). Set `SMTP_*` to send real email. For local testing, `MAIL_PREVIEW_DIR=/some/folder` writes every email as an `.html` file instead.
 
 ## API
 

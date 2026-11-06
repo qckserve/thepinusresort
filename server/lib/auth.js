@@ -5,7 +5,7 @@
 // Passwords use scrypt. Tokens are signed and carry token_version, so changing a password
 // or deactivating someone signs them out everywhere.
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import { one, all, run, audit } from './db.js';
+import { col, nextId, nowIso, audit } from './db.js';
 import { site } from './site.js';
 import { AppError } from './errors.js';
 
@@ -38,17 +38,22 @@ function checkStrength(pw) {
 }
 
 /** First run: create the owner account from ADMIN_PASSWORD (and ADMIN_EMAIL) if nobody exists yet. */
-export function bootstrapOwner() {
-  if (Number(one('SELECT COUNT(*) AS n FROM staff').n) > 0) return;
+export async function bootstrapOwner() {
+  if (await col('staff').countDocuments({}, { limit: 1 })) return;
   const pw = process.env.ADMIN_PASSWORD;
   if (!pw) {
     console.warn('[auth] No staff accounts and ADMIN_PASSWORD not set; the admin panel is locked.');
     return;
   }
   const email = (process.env.ADMIN_EMAIL || site.email).toLowerCase();
-  run("INSERT INTO staff (email, name, role, password_hash) VALUES (?, 'Owner', 'owner', ?)", email, hashPassword(pw));
-  console.log(`[auth] Created owner account ${email} from ADMIN_PASSWORD.`);
+  try {
+    await col('staff').insertOne(newStaff(await nextId('staff'), email, 'Owner', 'owner', hashPassword(pw)));
+    console.log(`[auth] Created owner account ${email} from ADMIN_PASSWORD.`);
+  } catch (e) {
+    if (e.code !== 11000) throw e; // another instance created it first
+  }
 }
+const newStaff = (id, email, name, role, hash) => ({ _id: id, email, name, role, password_hash: hash, token_version: 1, is_active: true, failed_logins: 0, locked_until: null, last_login_at: null, created_at: nowIso() });
 
 const sign = (payload) => createHmac('sha256', SECRET).update(payload).digest('base64url');
 const same = (a, b) => {
@@ -57,8 +62,8 @@ const same = (a, b) => {
   return x.length === y.length && timingSafeEqual(x, y);
 };
 
-export function login(email, password) {
-  const user = one('SELECT * FROM staff WHERE email = ?', String(email || '').trim());
+export async function login(email, password) {
+  const user = await col('staff').findOne({ email: String(email || '').trim().toLowerCase() });
   if (user?.locked_until && user.locked_until > new Date().toISOString()) {
     throw new AppError('RATE_LIMITED', `Too many attempts. Try again after ${new Date(user.locked_until).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit' })}.`);
   }
@@ -68,27 +73,27 @@ export function login(email, password) {
     if (user) {
       const fails = user.failed_logins + 1;
       const lock = fails >= MAX_FAILS ? new Date(Date.now() + LOCK_MIN * 60000).toISOString() : null;
-      run('UPDATE staff SET failed_logins = ?, locked_until = ? WHERE id = ?', lock ? 0 : fails, lock, user.id);
+      await col('staff').updateOne({ _id: user._id }, { $set: { failed_logins: lock ? 0 : fails, locked_until: lock } });
     }
     throw new AppError('UNAUTHORIZED', 'Wrong email or password.');
   }
-  run("UPDATE staff SET failed_logins = 0, locked_until = NULL, last_login_at = strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id = ?", user.id);
-  audit(user.id, 'LOGIN', `${user.name} signed in`);
-  const payload = Buffer.from(JSON.stringify({ uid: user.id, v: user.token_version, exp: Date.now() + TTL_MS })).toString('base64url');
+  await col('staff').updateOne({ _id: user._id }, { $set: { failed_logins: 0, locked_until: null, last_login_at: nowIso() } });
+  await audit(user._id, 'LOGIN', `${user.name} signed in`);
+  const payload = Buffer.from(JSON.stringify({ uid: user._id, v: user.token_version, exp: Date.now() + TTL_MS })).toString('base64url');
   return { token: `${payload}.${sign(payload)}`, user: publicUser(user) };
 }
 
-const publicUser = (u) => ({ id: u.id, email: u.email, name: u.name, role: u.role, isActive: !!u.is_active, lastLoginAt: u.last_login_at });
+const publicUser = (u) => ({ id: u._id, email: u.email, name: u.name, role: u.role, isActive: !!u.is_active, lastLoginAt: u.last_login_at });
 
 /** Express middleware factory: requireStaff('manager') lets managers and owners through. */
 export function requireStaff(minRole = 'frontdesk') {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     const token = (req.get('authorization') || '').replace(/^Bearer\s+/i, '');
     const [payload, sig] = token.split('.');
     if (payload && sig && same(sig, sign(payload))) {
       try {
         const t = JSON.parse(Buffer.from(payload, 'base64url').toString());
-        const u = t.exp > Date.now() && one('SELECT * FROM staff WHERE id = ?', t.uid);
+        const u = t.exp > Date.now() && await col('staff').findOne({ _id: t.uid });
         if (u && u.is_active && u.token_version === t.v) {
           if (RANK[u.role] < RANK[minRole]) return res.status(403).json({ error: 'Your role cannot do this.' });
           req.staff = publicUser(u);
@@ -101,42 +106,41 @@ export function requireStaff(minRole = 'frontdesk') {
 }
 
 /* ---------- Staff management (owner only) ---------- */
-export const listStaff = () => all('SELECT * FROM staff ORDER BY is_active DESC, role, name').map(publicUser);
+export const listStaff = async () => (await col('staff').find().sort({ is_active: -1, role: 1, name: 1 }).toArray()).map(publicUser);
 
-export function createStaff(byId, b) {
+export async function createStaff(byId, b) {
   const email = String(b.email || '').trim().toLowerCase();
   const name = String(b.name || '').trim().slice(0, 80);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new AppError('VALIDATION_ERROR', 'Check the email');
   if (name.length < 2) throw new AppError('VALIDATION_ERROR', 'Name is needed');
   if (!ROLES.includes(b.role)) throw new AppError('VALIDATION_ERROR', 'Choose a role');
   checkStrength(b.password);
-  if (one('SELECT 1 FROM staff WHERE email = ?', email)) throw new AppError('CONFLICT', 'That email already has an account');
-  run('INSERT INTO staff (email, name, role, password_hash) VALUES (?, ?, ?, ?)', email, name, b.role, hashPassword(b.password));
-  audit(byId, 'STAFF', `Added ${name} (${b.role})`);
+  if (await col('staff').findOne({ email })) throw new AppError('CONFLICT', 'That email already has an account');
+  await col('staff').insertOne(newStaff(await nextId('staff'), email, name, b.role, hashPassword(b.password)));
+  await audit(byId, 'STAFF', `Added ${name} (${b.role})`);
 }
 
-export function updateStaff(byId, id, b) {
-  const u = one('SELECT * FROM staff WHERE id = ?', id);
+export async function updateStaff(byId, id, b) {
+  const u = await col('staff').findOne({ _id: id });
   if (!u) throw new AppError('NOT_FOUND', 'Account not found');
   const role = b.role === undefined ? u.role : b.role;
   if (!ROLES.includes(role)) throw new AppError('VALIDATION_ERROR', 'Choose a role');
-  const active = b.isActive === undefined ? u.is_active : b.isActive ? 1 : 0;
+  const active = b.isActive === undefined ? !!u.is_active : !!b.isActive;
   if (u.role === 'owner' && (role !== 'owner' || !active)) {
-    const owners = Number(one("SELECT COUNT(*) AS n FROM staff WHERE role = 'owner' AND is_active = 1").n);
+    const owners = await col('staff').countDocuments({ role: 'owner', is_active: true });
     if (owners <= 1) throw new AppError('CONFLICT', 'There must always be one active owner');
   }
   let hash = u.password_hash;
-  let bump = role !== u.role || active !== u.is_active;
+  let bump = role !== u.role || active !== !!u.is_active;
   if (b.password) { checkStrength(b.password); hash = hashPassword(b.password); bump = true; }
-  run('UPDATE staff SET role = ?, is_active = ?, password_hash = ?, token_version = token_version + ?, failed_logins = 0, locked_until = NULL WHERE id = ?',
-    role, active, hash, bump ? 1 : 0, id);
-  audit(byId, 'STAFF', `Updated ${u.name}${b.password ? ': password reset' : ''}${role !== u.role ? `: role ${role}` : ''}${active !== u.is_active ? (active ? ': reactivated' : ': deactivated') : ''}`);
+  await col('staff').updateOne({ _id: id }, { $set: { role, is_active: active, password_hash: hash, failed_logins: 0, locked_until: null }, $inc: { token_version: bump ? 1 : 0 } });
+  await audit(byId, 'STAFF', `Updated ${u.name}${b.password ? ': password reset' : ''}${role !== u.role ? `: role ${role}` : ''}${active !== !!u.is_active ? (active ? ': reactivated' : ': deactivated') : ''}`);
 }
 
-export function changeOwnPassword(id, current, next) {
-  const u = one('SELECT * FROM staff WHERE id = ?', id);
+export async function changeOwnPassword(id, current, next) {
+  const u = await col('staff').findOne({ _id: id });
   if (!u || !verifyPassword(String(current || ''), u.password_hash)) throw new AppError('UNAUTHORIZED', 'Current password is wrong');
   checkStrength(next);
-  run('UPDATE staff SET password_hash = ?, token_version = token_version + 1 WHERE id = ?', hashPassword(next), id);
-  audit(id, 'STAFF', `${u.name} changed their password`);
+  await col('staff').updateOne({ _id: id }, { $set: { password_hash: hashPassword(next) }, $inc: { token_version: 1 } });
+  await audit(id, 'STAFF', `${u.name} changed their password`);
 }

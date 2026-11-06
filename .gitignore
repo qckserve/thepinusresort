@@ -3,4 +3,6 @@ dist
 .env
 data/*.db
 data/*.db-*
+data/mongo/
+.vercel
 .DS_Store
