@@ -4,7 +4,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readdirSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { MongoMemoryReplSet } from 'mongodb-memory-server-core';
@@ -22,11 +22,15 @@ let mongo;
 const day = (n) => new Date(Date.now() + n * 864e5 + 5.5 * 3600e3).toISOString().slice(0, 10);
 const T = day(3);
 const T2 = day(5);
-async function call(method, path, body, t = tok) {
-  const r = await fetch(B + path, { method, headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: `Bearer ${t}` } : {}) }, body: body ? JSON.stringify(body) : undefined });
+// `t` is a session cookie ("pinus_session=..."), '' for none. Changes carry the admin header.
+async function call(method, path, body, t = tok, { header = true } = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(t ? { Cookie: t } : {}), ...(header ? { 'X-Pinus-Admin': '1' } : {}) };
+  const r = await fetch(B + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
   const ct = r.headers.get('content-type') || '';
-  return { status: r.status, body: ct.includes('json') ? await r.json() : await r.text() };
+  const set = r.headers.getSetCookie().find((c) => c.startsWith('pinus_session='));
+  return { status: r.status, body: ct.includes('json') ? await r.json() : await r.text(), cookie: set ? set.split(';')[0] : null, setCookie: set };
 }
+const signIn = async (email, password, extra = {}) => call('POST', '/admin/login', { email, password, ...extra }, '');
 
 before(async () => {
   rs = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: 'wiredTiger' } });
@@ -35,7 +39,7 @@ before(async () => {
   srv = spawn(process.execPath, ['server/index.js'], {
     cwd: resolve(import.meta.dirname, '..'),
     env: { ...process.env, MONGODB_URI: uri, MONGODB_DB: 'pinus_test', PORT: String(PORT), ADMIN_PASSWORD: 'test-owner-pass', ADMIN_EMAIL: 'owner@example.com',
-      SESSION_SECRET: 'test-secret', DISABLE_JOBS: '1', MAIL_PREVIEW_DIR: mails, PUBLIC_URL: 'http://localhost:5173', CRON_SECRET: 'cron-test-secret', NODE_ENV: 'test' },
+      SESSION_SECRET: 'test-secret', DISABLE_JOBS: '1', MAIL_PREVIEW_DIR: mails, PUBLIC_URL: 'http://localhost:5173', CRON_SECRET: 'cron-test-secret', NODE_ENV: 'test', LOGIN_LIMIT: '500' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   srv.stdout.on('data', (d) => (log += d));
@@ -44,9 +48,12 @@ before(async () => {
     try { if ((await fetch(`${B}/health`)).ok) break; } catch {}
     await new Promise((r) => setTimeout(r, 150));
   }
-  const login = await call('POST', '/admin/login', { email: 'owner@example.com', password: 'test-owner-pass' }, '');
+  const login = await signIn('owner@example.com', 'test-owner-pass');
   assert.equal(login.status, 200, JSON.stringify(login.body));
-  tok = login.body.token;
+  assert.match(login.setCookie, /HttpOnly/i);
+  assert.match(login.setCookie, /SameSite=Strict/i);
+  assert.doesNotMatch(login.setCookie, /Expires/i, 'without "remember" the cookie ends with the browser');
+  tok = login.cookie;
 });
 
 after(async () => {
@@ -141,20 +148,81 @@ test('day-before-checkout and review emails go out once, review page works', asy
 });
 
 test('cron endpoint needs the secret', async () => {
-  assert.equal((await call('GET', '/cron', null, '')).status, 401);
-  assert.equal((await call('GET', '/cron', null, 'wrong')).status, 401);
-  assert.equal((await call('GET', '/cron', null, 'cron-test-secret')).status, 200);
+  const cron = async (secret) => (await fetch(`${B}/cron`, { headers: secret ? { Authorization: `Bearer ${secret}` } : {} })).status;
+  assert.equal(await cron(''), 401);
+  assert.equal(await cron('wrong'), 401);
+  assert.equal(await cron('cron-test-secret'), 200);
 });
 
 test('roles and lockout', async () => {
   await call('POST', '/admin/staff', { email: 'desk@example.com', name: 'Desk', role: 'frontdesk', password: 'desk-password-1' });
-  const desk = (await call('POST', '/admin/login', { email: 'desk@example.com', password: 'desk-password-1' }, '')).body.token;
+  const desk = (await signIn('desk@example.com', 'desk-password-1')).cookie;
   assert.equal((await call('POST', '/admin/bulk', {}, desk)).status, 403);
   assert.equal((await call('GET', '/admin/calendar', null, desk)).status, 200);
-  for (let i = 0; i < 5; i++) await call('POST', '/admin/login', { email: 'desk@example.com', password: 'wrong' }, '');
-  assert.equal((await call('POST', '/admin/login', { email: 'desk@example.com', password: 'desk-password-1' }, '')).status, 429);
+  for (let i = 0; i < 5; i++) await signIn('desk@example.com', 'wrong');
+  assert.equal((await signIn('desk@example.com', 'desk-password-1')).status, 429);
   const audit = await call('GET', '/admin/audit');
   assert.ok(audit.body.items.length > 5);
   const csv = await call('GET', '/admin/reservations.csv');
   assert.match(csv.body, /^Reference,Status/);
+});
+
+test('sessions: header required for changes, sign out really ends the session', async () => {
+  assert.equal((await call('GET', '/admin/me', null, '')).status, 401);
+  assert.equal((await call('POST', '/admin/bulk', {}, tok, { header: false })).status, 403, 'no CSRF header');
+  assert.equal((await call('POST', '/admin/login', { email: 'owner@example.com', password: 'test-owner-pass' }, '', { header: false })).status, 403);
+  const kept = await signIn('owner@example.com', 'test-owner-pass', { remember: true });
+  assert.match(kept.setCookie, /Expires=/i, '"keep me signed in" sets a 30-day cookie');
+  assert.equal((await call('GET', '/admin/me', null, kept.cookie)).status, 200);
+  await call('POST', '/admin/logout', {}, kept.cookie);
+  assert.equal((await call('GET', '/admin/me', null, kept.cookie)).status, 401, 'cookie no longer works after sign out');
+  assert.equal((await call('GET', '/admin/me', null, 'pinus_session=forged-token-forged-token-forged-token-forg')).status, 401);
+});
+
+test('invite: owner adds staff, they set a password from the link and are signed in', async () => {
+  const add = await call('POST', '/admin/staff', { email: 'manager@example.com', name: 'Mona Manager', role: 'manager', invite: true });
+  assert.equal(add.status, 200, JSON.stringify(add.body));
+  assert.equal(add.body.link, null, 'emailed, so no link is handed back');
+  const mona = add.body.items.find((u) => u.email === 'manager@example.com');
+  assert.equal(mona.invited, true);
+  assert.equal((await signIn('manager@example.com', 'anything-at-all')).status, 401, 'cannot sign in before setting a password');
+  const file = readdirSync(mails).find((f) => f.includes('Your-sign-in-for'));
+  assert.ok(file, 'invite email written');
+  const token = decodeURIComponent(readFileSync(join(mails, file), 'utf8').match(/\?set=([A-Za-z0-9_%-]+)/)[1]);
+  const info = await call('GET', `/admin/link?t=${token}`, null, '');
+  assert.deepEqual(info.body, { kind: 'invite', name: 'Mona Manager', email: 'manager@example.com' });
+  assert.equal((await call('POST', '/admin/link', { token, password: 'short' }, '')).status, 422);
+  const done = await call('POST', '/admin/link', { token, password: 'mona-strong-pass' }, '');
+  assert.equal(done.status, 200, JSON.stringify(done.body));
+  assert.equal((await call('GET', '/admin/me', null, done.cookie)).body.user.role, 'manager');
+  assert.equal((await call('POST', '/admin/link', { token, password: 'mona-other-pass1' }, '')).status, 404, 'link works once');
+});
+
+test('forgot password: same answer for unknown emails, link resets and signs out old sessions', async () => {
+  const before = readdirSync(mails).length;
+  assert.deepEqual((await call('POST', '/admin/forgot', { email: 'nobody@example.com' }, '')).body, { ok: true, mailEnabled: true });
+  const old = (await signIn('manager@example.com', 'mona-strong-pass')).cookie;
+  assert.equal((await call('POST', '/admin/forgot', { email: 'manager@example.com' }, '')).status, 200);
+  await new Promise((r) => setTimeout(r, 300));
+  const files = readdirSync(mails);
+  assert.equal(files.length, before + 1, 'only the real account got an email');
+  const file = files.find((f) => f.includes('Reset-your-password'));
+  const token = decodeURIComponent(readFileSync(join(mails, file), 'utf8').match(/\?set=([A-Za-z0-9_%-]+)/)[1]);
+  assert.equal((await call('POST', '/admin/link', { token, password: 'mona-new-password' }, '')).status, 200);
+  assert.equal((await call('GET', '/admin/me', null, old)).status, 401, 'old sessions ended');
+  assert.equal((await signIn('manager@example.com', 'mona-strong-pass')).status, 401);
+  assert.equal((await signIn('manager@example.com', 'mona-new-password')).status, 200);
+});
+
+test('changing your own password signs out your other devices only', async () => {
+  const a = (await signIn('manager@example.com', 'mona-new-password')).cookie;
+  const b = (await signIn('manager@example.com', 'mona-new-password')).cookie;
+  assert.equal((await call('POST', '/admin/me/password', { current: 'wrong', next: 'whatever-long-1' }, a)).status, 401);
+  assert.equal((await call('POST', '/admin/me/password', { current: 'mona-new-password', next: 'mona-newest-pass' }, a)).status, 200);
+  assert.equal((await call('GET', '/admin/me', null, a)).status, 200, 'this device stays in');
+  assert.equal((await call('GET', '/admin/me', null, b)).status, 401, 'the other device is out');
+  // Deactivating someone ends their sessions at once.
+  const mona = (await call('GET', '/admin/staff')).body.items.find((u) => u.email === 'manager@example.com');
+  await call('PATCH', `/admin/staff/${mona.id}`, { isActive: false });
+  assert.equal((await call('GET', '/admin/me', null, a)).status, 401);
 });

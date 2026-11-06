@@ -10,22 +10,57 @@
 <body class="admin">
   <!-- include:icons -->
   <div class="login-wrap" data-login-view hidden>
-    <form class="login-card" data-login>
+    <div class="login-card">
       <img src="/logo.png" alt="The Pinus Resort" width="269" height="269">
-      <h1>Staff sign in</h1>
-      <label class="f"><span>Email</span><input class="inp" name="email" type="email" autocomplete="username" required></label>
-      <label class="f"><span>Password</span><input class="inp" name="password" type="password" autocomplete="current-password" required></label>
-      <div class="note-box bad" data-login-error hidden></div>
-      <button class="b b--primary" type="submit">Sign in</button>
-    </form>
+
+      <form class="login-pane" data-pane="login" data-login novalidate>
+        <h1>Staff sign in</h1>
+        <p class="meta login-sub">Leads, bookings and room inventory for The Pinus Resort.</p>
+        <div class="note-box" data-first-run hidden>No staff accounts exist yet. Add <b>ADMIN_EMAIL</b> and <b>ADMIN_PASSWORD</b> to the server settings (Vercel &gt; Settings &gt; Environment Variables), redeploy, then sign in with them.</div>
+        <label class="f"><span>Email</span><input class="inp" name="email" type="email" autocomplete="username" inputmode="email" required></label>
+        <label class="f"><span>Password</span>
+          <span class="pw-wrap"><input class="inp" name="password" type="password" autocomplete="current-password" required><button type="button" class="pw-toggle" data-show-pw aria-label="Show password">Show</button></span>
+        </label>
+        <div class="login-row">
+          <label class="check"><input type="checkbox" name="remember"> Keep me signed in for 30 days</label>
+          <button type="button" class="lnk" data-go-pane="forgot">Forgot password?</button>
+        </div>
+        <div class="note-box bad" data-err hidden></div>
+        <button class="b b--primary" type="submit">Sign in</button>
+        <p class="meta login-foot">Only tick "keep me signed in" on the resort's own computer or phone.</p>
+      </form>
+
+      <form class="login-pane" data-pane="forgot" data-forgot novalidate hidden>
+        <h1>Reset your password</h1>
+        <p class="meta login-sub">Enter your work email. If it has an account, we will email you a link to choose a new password. The link works for 30 minutes.</p>
+        <label class="f"><span>Email</span><input class="inp" name="email" type="email" autocomplete="username" inputmode="email" required></label>
+        <div class="note-box" data-msg hidden></div>
+        <button class="b b--primary" type="submit">Email me a reset link</button>
+        <button type="button" class="lnk login-back" data-go-pane="login">Back to sign in</button>
+      </form>
+
+      <form class="login-pane" data-pane="set" data-set novalidate hidden>
+        <h1 data-set-title>Choose your password</h1>
+        <p class="meta login-sub" data-set-sub>Checking your link...</p>
+        <div data-set-fields hidden>
+          <label class="f"><span>New password <small class="hint">(at least 10 characters)</small></span>
+            <span class="pw-wrap"><input class="inp" name="password" type="password" autocomplete="new-password" minlength="10" required><button type="button" class="pw-toggle" data-show-pw aria-label="Show password">Show</button></span>
+          </label>
+          <label class="f"><span>Type it again</span><input class="inp" name="confirm" type="password" autocomplete="new-password" minlength="10" required></label>
+        </div>
+        <div class="note-box bad" data-err hidden></div>
+        <button class="b b--primary" type="submit" data-set-btn hidden>Save password and sign in</button>
+        <button type="button" class="lnk login-back" data-go-pane="login">Back to sign in</button>
+      </form>
+    </div>
   </div>
 
   <div class="ad" data-app hidden>
     <aside class="ad-side">
       <div class="ad-brand"><img src="/logo-cream-emblem.png" alt="" width="47" height="38">The Pinus</div>
       <nav class="ad-nav" aria-label="Admin" data-nav></nav>
-      <div class="ad-mobile-user"><span data-user-name></span><button type="button" data-pw>Password</button><button type="button" data-logout>Sign out</button></div>
-      <div class="ad-user"><b data-user-name></b><span data-user-role></span><br><button type="button" data-pw>Change password</button><button type="button" data-logout>Sign out</button></div>
+      <div class="ad-mobile-user"><span data-user-name></span><button type="button" data-pw>My account</button><button type="button" data-logout>Sign out</button></div>
+      <div class="ad-user"><b data-user-name></b><span data-user-role></span><br><button type="button" data-pw>My account</button><button type="button" data-logout>Sign out</button></div>
     </aside>
     <main class="ad-main" id="main" data-view></main>
   </div>

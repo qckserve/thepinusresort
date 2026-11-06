@@ -164,3 +164,19 @@ dialog.dlg::backdrop { background: rgba(20, 29, 26, .55); }
 .login-card { background: var(--white); width: min(420px, 100%); padding: 32px; display: grid; gap: 16px; }
 .login-card img { height: 72px; width: auto; justify-self: center; }
 .login-card h1 { font-family: var(--serif); font-weight: 500; font-size: 1.8rem; text-align: center; }
+
+/* Sign-in screens */
+.login-card { gap: 0; }
+.login-pane { display: grid; gap: 14px; margin-top: 8px; }
+.login-sub { text-align: center; margin-top: -6px; }
+.login-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; }
+.login-row .check { font-size: 13.5px; }
+.login-foot { text-align: center; font-size: 12px; }
+.login-back { justify-self: center; }
+.pw-wrap { position: relative; display: block; }
+.pw-wrap .inp { padding-right: 64px; }
+.pw-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 6px 8px; }
+.pw-toggle:hover { color: var(--ink); }
+button.lnk { background: none; border: 0; cursor: pointer; padding: 4px 0; }
+.copy-row { display: flex; gap: 8px; }
+.copy-row .inp { font-size: 12.5px; }

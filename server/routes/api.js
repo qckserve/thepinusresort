@@ -3,8 +3,9 @@ import { waitUntil } from '@vercel/functions';
 import { timingSafeEqual } from 'node:crypto';
 import { ready, col, nowIso, createEnquiry, listEnquiries, countByStatus, updateEnquiry, LEAD_STATUSES, getSettings } from '../lib/db.js';
 import { validateEnquiry } from '../lib/validate.js';
-import { sendLeadEmails, sendConfirmation, sendPreCheckout, sendReviewRequest, mailEnabled, adminRecipients } from '../lib/mail.js';
-import { bootstrapOwner, login, requireStaff, listStaff, createStaff, updateStaff, changeOwnPassword, ROLES } from '../lib/auth.js';
+import { sendLeadEmails, sendConfirmation, sendPreCheckout, sendReviewRequest, sendStaffLink, mailEnabled, adminRecipients } from '../lib/mail.js';
+import * as auth from '../lib/auth.js';
+import { requireStaff, ROLES } from '../lib/auth.js';
 import * as inv from '../lib/inventory.js';
 import * as res from '../lib/reservations.js';
 import { runJobs } from '../lib/scheduler.js';
@@ -90,11 +91,50 @@ api.use('/admin', staff);
 // First admin request on a fresh instance: make sure the owner account exists (from ADMIN_PASSWORD).
 let ownerReady = null;
 staff.use((req, r, next) => {
-  ownerReady ??= bootstrapOwner().catch((e) => { ownerReady = null; throw e; });
+  ownerReady ??= auth.bootstrapOwner().catch((e) => { ownerReady = null; throw e; });
   ownerReady.then(() => next(), next);
 });
 
-staff.post('/login', limiter(10, 15 * 60 * 1000), h((req) => login(req.body?.email, req.body?.password)));
+// Sign-in pages call these without a session. State-changing ones still need the admin header.
+const needHeader = (req, r, next) => (req.get('x-pinus-admin') === '1' ? next() : r.status(403).json({ error: 'Missing request header.' }));
+const meta = (req) => ({ ip: req.ip, userAgent: req.get('user-agent') });
+
+staff.get('/status', h(async () => ({ hasStaff: await auth.hasStaff(), mailEnabled })));
+
+// Per IP (a whole office shares one); the per-account lockout is the main brute-force guard.
+const LOGIN_LIMIT = Number(process.env.LOGIN_LIMIT || 30);
+staff.post('/login', needHeader, limiter(LOGIN_LIMIT, 15 * 60 * 1000), h(async (req, r) => {
+  const out = await auth.login(req.body?.email, req.body?.password, { remember: !!req.body?.remember, ...meta(req) });
+  auth.setCookie(r, out.token, out.expires, out.remember);
+  return { user: out.user };
+}));
+
+staff.post('/logout', needHeader, h(async (req, r) => {
+  await auth.logout(auth.readCookie(req), { everywhere: !!req.body?.everywhere });
+  auth.clearCookie(r);
+  return { ok: true };
+}));
+
+// Forgot password: same answer whether or not the email has an account.
+staff.post('/forgot', needHeader, limiter(5, 15 * 60 * 1000), h(async (req) => {
+  if (!mailEnabled) return { ok: true, mailEnabled: false };
+  const started = await auth.startPasswordReset(req.body?.email);
+  if (started) later(sendStaffLink({ user: started.user, token: started.token, kind: 'reset' }));
+  return { ok: true, mailEnabled: true };
+}));
+
+// Reset / invite links: check, then set the password and sign straight in.
+staff.get('/link', limiter(30, 15 * 60 * 1000), h(async (req) => {
+  const l = await auth.checkLink(req.query.t);
+  if (!l) throw new AppError('NOT_FOUND', 'This link has expired or was already used. Ask for a new one.');
+  return l;
+}));
+staff.post('/link', needHeader, limiter(10, 15 * 60 * 1000), h(async (req, r) => {
+  const { email } = await auth.completePasswordLink(req.body?.token, req.body?.password);
+  const out = await auth.login(email, req.body.password, { remember: false, ...meta(req) });
+  auth.setCookie(r, out.token, out.expires, false);
+  return { user: out.user };
+}));
 
 const desk = requireStaff('frontdesk');
 const manager = requireStaff('manager');
@@ -102,7 +142,8 @@ const owner = requireStaff('owner');
 const num = (v) => Number(v);
 
 staff.get('/me', desk, h(async (req) => ({ user: req.staff, mailEnabled, notify: await adminRecipients(), site: { name: site.name, url: site.url } })));
-staff.post('/me/password', desk, h(async (req) => { await changeOwnPassword(req.staff.id, req.body?.current, req.body?.next); return { ok: true }; }));
+staff.get('/me/sessions', desk, h(async (req) => ({ items: await auth.listSessions(req.staff.id, req.sessionToken) })));
+staff.post('/me/password', desk, h(async (req) => { await auth.changeOwnPassword(req.staff.id, req.body?.current, req.body?.next, req.sessionToken); return { ok: true }; }));
 
 staff.get('/dashboard', desk, h(async () => {
   const [counts, arrivals, departures, leads] = await Promise.all([
@@ -215,9 +256,23 @@ staff.get('/audit', manager, h(async () => {
 staff.post('/jobs/run', owner, h(async () => (await runJobs({ force: true })) || { busy: true }));
 
 /* ---- Staff accounts ---- */
-staff.get('/staff', owner, h(async () => ({ items: await listStaff(), roles: ROLES })));
-staff.post('/staff', owner, h(async (req) => { await createStaff(req.staff.id, req.body || {}); return { items: await listStaff() }; }));
-staff.patch('/staff/:id', owner, h(async (req) => { await updateStaff(req.staff.id, num(req.params.id), req.body || {}); return { items: await listStaff() }; }));
+staff.get('/staff', owner, h(async () => ({ items: await auth.listStaff(), roles: ROLES, mailEnabled })));
+// Invites are emailed. Without email set up, the owner gets the link to pass on (e.g. WhatsApp).
+staff.post('/staff', owner, h(async (req) => {
+  const { user, inviteToken } = await auth.createStaff(req.staff.id, req.body || {});
+  let link = null;
+  if (inviteToken) {
+    const sent = await sendStaffLink({ user, token: inviteToken, kind: 'invite' });
+    if (sent.status !== 'sent') link = sent.link;
+  }
+  return { items: await auth.listStaff(), link };
+}));
+staff.post('/staff/:id/link', owner, h(async (req) => {
+  const { user, token } = await auth.reinvite(req.staff.id, num(req.params.id));
+  const sent = await sendStaffLink({ user, token, kind: user.invited ? 'invite' : 'reset' });
+  return { emailed: sent.status === 'sent', link: sent.status === 'sent' ? null : sent.link };
+}));
+staff.patch('/staff/:id', owner, h(async (req) => { await auth.updateStaff(req.staff.id, num(req.params.id), req.body || {}); return { items: await auth.listStaff() }; }));
 
 /* ---- Errors ---- */
 api.use((req, r) => r.status(404).json({ error: 'Not found' }));

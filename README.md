@@ -6,7 +6,7 @@ New website for [thepinusresort.com](https://thepinusresort.com): a fast multi-p
 
 ```bash
 npm install
-cp .env.example .env   # set ADMIN_PASSWORD and SESSION_SECRET; leave MONGODB_URI empty
+cp .env.example .env   # set ADMIN_PASSWORD; leave MONGODB_URI empty
 npm run dev            # local MongoDB on :27027, site on :5173, API on :8787
 npm test               # end-to-end API tests against a throwaway MongoDB
 ```
@@ -17,7 +17,7 @@ npm test               # end-to-end API tests against a throwaway MongoDB
 
 1. Import `qckserve/thepinusresort` in Vercel. `vercel.json` sets everything: Vite builds the site into `dist/`, `/api/*` runs `api/index.js` (the Express app as one function), old WordPress URLs redirect, and a daily cron calls `/api/cron` at 10:00 India time.
 2. In MongoDB Atlas: **Network Access** > allow `0.0.0.0/0` (Vercel has no fixed IPs), and copy the connection string from **Connect > Drivers**.
-3. In Vercel > Settings > Environment Variables, add: `MONGODB_URI`, `MONGODB_DB`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SESSION_SECRET`, `CRON_SECRET`, `PUBLIC_URL`, and the `SMTP_*` / `MAIL_*` values.
+3. In Vercel > Settings > Environment Variables, add: `MONGODB_URI`, `MONGODB_DB`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `CRON_SECRET`, `PUBLIC_URL`, and the `SMTP_*` / `MAIL_*` values.
 4. Deploy, open `/admin/`, sign in, set the room count and rates.
 
 On the Hobby plan Vercel Cron runs once a day, so "check-out tomorrow" emails go at 10:00 and review requests the morning after check-out (or straight away when the desk marks a guest checked out). For more frequent runs, point a free cron service (e.g. cron-job.org) at `https://<site>/api/cron` with header `Authorization: Bearer <CRON_SECRET>`.
@@ -46,6 +46,17 @@ Needs Node 22.13+ and the same environment variables.
 | `vercel.json` | Vercel build, rewrites, redirects, headers, cron |
 | `scripts/dev-mongo.mjs` | Local MongoDB replica set for development |
 | `test/api.test.mjs` | End-to-end API tests (`npm test`) |
+
+## Staff sign-in
+
+Staff sign in at **/admin/** (or **/login**) with their work email and password.
+
+- **First owner:** on the first admin request an owner account is created from `ADMIN_EMAIL` + `ADMIN_PASSWORD`. Change that password afterwards under My account.
+- **Adding staff:** Staff > Add staff. Choose "email them an invite" (they set their own password from a one-time link, valid 7 days) or set a password yourself. Without email set up, the admin shows the invite link to send on WhatsApp.
+- **Forgot password:** "Forgot password?" on the sign-in screen emails a one-time link valid for 30 minutes. The owner can also send a reset link or set a new password under Staff.
+- **Keep me signed in:** 30 days on that device; otherwise the session ends when the browser closes (and after 12 hours at most).
+- **Security:** the session is an HttpOnly, SameSite=Strict cookie (page scripts cannot read it), only its hash is stored, every change needs the `X-Pinus-Admin` header (blocks cross-site requests), 5 wrong passwords lock the account for 15 minutes, and changing a password, role or access signs that person out everywhere. My account lists signed-in devices and has "Sign out of all devices".
+- **Locked out with no email:** `MONGODB_URI="..." node scripts/staff-password.mjs owner@example.com` sets a new password from the command line.
 
 ## Admin and inventory (`/admin/`)
 

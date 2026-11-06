@@ -22,7 +22,8 @@ const transport = MAIL_PREVIEW_DIR
     ? nodemailer.createTransport({ host: SMTP_HOST, port: Number(SMTP_PORT || 465), secure: Number(SMTP_PORT || 465) === 465, auth: { user: SMTP_USER, pass: SMTP_PASS } })
     : null;
 const FROM = MAIL_FROM || `The Pinus Resort <${SMTP_USER || site.email}>`;
-const BASE = (PUBLIC_URL || site.url).replace(/\/$/, '');
+// Links in emails: PUBLIC_URL, else Vercel's production address, else the site URL.
+const BASE = (PUBLIC_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : site.url)).replace(/\/$/, '');
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const inr = (minor) => (minor == null ? '' : `INR ${(minor / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`);
@@ -271,4 +272,28 @@ export async function sendReviewRequest(reservationId) {
     text: `Review request for ${r.guest_name} (${r.reference}): ${link}`,
   }));
   return Promise.all(jobs);
+}
+
+/* ---------- Staff: password reset and invites ---------- */
+export async function sendStaffLink({ user, token, kind }) {
+  const link = `${BASE}/admin/?set=${encodeURIComponent(token)}`;
+  const invite = kind === 'invite';
+  const title = invite ? `Welcome to the team, ${firstName(user.name)}` : 'Reset your password';
+  const status = await send({
+    kind: invite ? 'staff_invite' : 'staff_reset',
+    to: user.email,
+    subject: invite ? 'Your sign-in for The Pinus Resort admin' : 'Reset your password | The Pinus Resort admin',
+    html: layout({
+      preheader: invite ? 'Set your password to start using the admin' : 'This link works once and expires in 30 minutes',
+      eyebrow: invite ? 'Staff invite' : 'Password reset',
+      title,
+      intro: invite
+        ? `<p>You have been given <b>${esc(user.role)}</b> access to The Pinus Resort admin, where the team manages leads, bookings and room inventory. Choose your password to get started.</p><p style="font-size:14px;color:#5e655f">This link works once and expires in 7 days.</p>`
+        : `<p>Someone asked to reset the password for <b>${esc(user.email)}</b>. If that was you, choose a new password below.</p><p style="font-size:14px;color:#5e655f">This link works once and expires in 30 minutes. If you did not ask for it, you can ignore this email; your password stays the same.</p>`,
+      button: { href: link, label: invite ? 'Set my password' : 'Choose a new password' },
+      after: `<p style="font:12px/1.6 Arial,sans-serif;color:#5e655f;word-break:break-all">Or paste this link into your browser:<br>${esc(link)}</p>`,
+    }),
+    text: `${title}\n\n${invite ? 'Set your password' : 'Choose a new password'}: ${link}\n\n${invite ? 'The link expires in 7 days.' : 'The link expires in 30 minutes. If you did not ask for it, ignore this email.'}`,
+  });
+  return { status, link };
 }

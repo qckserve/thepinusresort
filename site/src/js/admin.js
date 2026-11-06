@@ -1,12 +1,9 @@
 // The Pinus Resort admin: leads, bookings, inventory calendar, rooms and rates, reviews, emails, staff.
-// Plain JS against /api/admin. The token lives in sessionStorage (cleared when the tab closes).
+// Plain JS against /api/admin. The session lives in an HttpOnly cookie the page cannot read;
+// every request sends the X-Pinus-Admin header the server requires for changes.
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
-const KEY = 'pinus-admin-token';
-const store = {
-  get: () => { try { return sessionStorage.getItem(KEY); } catch { return null; } },
-  set: (v) => { try { v ? sessionStorage.setItem(KEY, v) : sessionStorage.removeItem(KEY); } catch {} },
-};
+const HEADERS = { 'Content-Type': 'application/json', 'X-Pinus-Admin': '1' };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const icon = (n) => `<svg class="icon"><use href="#i-${n}"/></svg>`;
 const iso = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -35,10 +32,11 @@ class ApiError extends Error { constructor(msg, data) { super(msg); this.data = 
 async function api(method, path, body) {
   const r = await fetch(`/api/admin${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${store.get()}` },
+    headers: HEADERS,
+    credentials: 'same-origin',
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (r.status === 401 && path !== '/login') { signOut(); throw new ApiError('Signed out'); }
+  if (r.status === 401 && me && !path.startsWith('/me/password')) { showSignIn('Your session has ended. Please sign in again.'); throw new ApiError('Signed out'); }
   const data = r.headers.get('content-type')?.includes('json') ? await r.json() : await r.text();
   if (!r.ok) throw new ApiError(data.error || 'Request failed', data);
   return data;
@@ -53,28 +51,101 @@ function toast(msg, bad) {
 }
 const can = (role) => me && RANK[me.role] >= RANK[role];
 
-/* ---------- Sign in / out ---------- */
+/* ---------- Sign in, forgot password, set password ---------- */
+const loginView = $('[data-login-view]');
+function pane(name) {
+  $$('[data-pane]', loginView).forEach((p) => (p.hidden = p.dataset.pane !== name));
+  $$('[data-err], [data-msg]', loginView).forEach((n) => (n.hidden = true));
+  $(`[data-pane="${name}"] input:not([type=checkbox])`, loginView)?.focus();
+}
+function showSignIn(message) {
+  me = null;
+  $('[data-app]').hidden = true;
+  loginView.hidden = false;
+  pane('login');
+  if (message) { const e = $('[data-pane="login"] [data-err]'); e.textContent = message; e.hidden = false; }
+}
+const paneErr = (form, msg) => { const e = $('[data-err]', form); e.textContent = msg; e.hidden = false; };
+$$('[data-go-pane]', loginView).forEach((b) => b.addEventListener('click', () => {
+  if (b.dataset.goPane === 'forgot') $('[data-forgot]').email.value = $('[data-login]').email.value;
+  pane(b.dataset.goPane);
+}));
+$$('[data-show-pw]').forEach((b) => b.addEventListener('click', () => {
+  const i = b.previousElementSibling;
+  i.type = i.type === 'password' ? 'text' : 'password';
+  b.textContent = i.type === 'password' ? 'Show' : 'Hide';
+}));
+
 $('[data-login]').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const err = $('[data-login-error]');
-  err.hidden = true;
+  const f = e.target;
+  $('[data-err]', f).hidden = true;
+  if (!f.email.value || !f.password.value) return paneErr(f, 'Enter your email and password.');
+  const btn = $('[type=submit]', f);
+  btn.disabled = true;
   try {
-    const out = await api('POST', '/login', { email: e.target.email.value, password: e.target.password.value });
-    store.set(out.token);
-    e.target.reset();
+    await api('POST', '/login', { email: f.email.value, password: f.password.value, remember: f.remember.checked });
+    f.password.value = '';
     start();
-  } catch (x) { err.textContent = x.message; err.hidden = false; }
+  } catch (x) { paneErr(f, x.message); } finally { btn.disabled = false; }
 });
-function signOut() { store.set(null); me = null; $('[data-app]').hidden = true; $('[data-login-view]').hidden = false; }
-$$('[data-logout]').forEach((b) => b.addEventListener('click', signOut));
-$$('[data-pw]').forEach((b) => b.addEventListener('click', passwordDialog));
+
+$('[data-forgot]').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const msg = $('[data-msg]', f);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(f.email.value)) { msg.className = 'note-box bad'; msg.textContent = 'Enter your work email.'; msg.hidden = false; return; }
+  try {
+    const out = await api('POST', '/forgot', { email: f.email.value });
+    msg.className = 'note-box ok';
+    msg.textContent = out.mailEnabled
+      ? 'If that email has an account, a reset link is on its way. Check your inbox (and spam) in a minute.'
+      : 'Email is not set up on this system yet, so we cannot send a link. Ask the owner to set a new password for you under Staff.';
+    msg.hidden = false;
+  } catch (x) { msg.className = 'note-box bad'; msg.textContent = x.message; msg.hidden = false; }
+});
+
+// Reset and invite links arrive as /admin/?set=TOKEN. The token is removed from the address bar at once.
+const linkToken = new URLSearchParams(location.search).get('set');
+if (linkToken) history.replaceState(null, '', location.pathname);
+async function openLink(token) {
+  loginView.hidden = false;
+  pane('set');
+  const f = $('[data-set]');
+  try {
+    const l = await api('GET', `/link?t=${encodeURIComponent(token)}`);
+    $('[data-set-title]').textContent = l.kind === 'invite' ? `Welcome, ${l.name.split(' ')[0]}` : 'Choose a new password';
+    $('[data-set-sub]').textContent = `${l.kind === 'invite' ? 'Set a password for' : 'New password for'} ${l.email}.`;
+    $('[data-set-fields]').hidden = false;
+    $('[data-set-btn]').hidden = false;
+    f.password.focus();
+  } catch (x) { $('[data-set-sub]').textContent = ''; paneErr(f, x.message); }
+  f.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    $('[data-err]', f).hidden = true;
+    if (f.password.value.length < 10) return paneErr(f, 'Use at least 10 characters.');
+    if (f.password.value !== f.confirm.value) return paneErr(f, 'The two passwords do not match.');
+    try { await api('POST', '/link', { token, password: f.password.value }); f.reset(); toast('Password saved. You are signed in.'); start(); } catch (x) { paneErr(f, x.message); }
+  });
+}
+
+async function signOut(everywhere = false) {
+  try { await api('POST', '/logout', { everywhere }); } catch {}
+  showSignIn();
+}
+$$('[data-logout]').forEach((b) => b.addEventListener('click', () => signOut()));
+$$('[data-pw]').forEach((b) => b.addEventListener('click', accountDialog));
 
 async function start() {
   try {
     const out = await api('GET', '/me');
     me = { ...out.user, mailEnabled: out.mailEnabled, notify: out.notify };
-  } catch { return signOut(); }
-  $('[data-login-view]').hidden = true;
+  } catch {
+    const st = await fetch('/api/admin/status').then((r) => r.json()).catch(() => ({}));
+    $('[data-first-run]').hidden = st.hasStaff !== false;
+    return showSignIn();
+  }
+  loginView.hidden = true;
   $('[data-app]').hidden = false;
   $$('[data-user-name]').forEach((n) => (n.textContent = me.name));
   $('[data-user-role]').textContent = `${me.role[0].toUpperCase()}${me.role.slice(1)} · ${me.email}`;
@@ -244,7 +315,7 @@ viewEl.addEventListener('change', async (e) => {
 viewEl.addEventListener('click', async (e) => {
   const c = e.target.closest('[data-csv]');
   if (!c) return;
-  const r = await fetch(`/api/admin${c.dataset.csv}`, { headers: { Authorization: `Bearer ${store.get()}` } });
+  const r = await fetch(`/api/admin${c.dataset.csv}`, { credentials: 'same-origin' });
   const url = URL.createObjectURL(await r.blob());
   Object.assign(document.createElement('a'), { href: url, download: `pinus-${c.dataset.csv.replace(/\W+/g, '-').replace(/^-|-csv$/g, '')}-${iso(new Date())}.csv` }).click();
   URL.revokeObjectURL(url);
@@ -624,46 +695,102 @@ RENDER.activity = async () => {
 /* ================= Staff ================= */
 RENDER.staff = async () => {
   const d = await api('GET', '/staff');
-  const roleHelp = { owner: 'Everything, including staff and settings', manager: 'Inventory, rates, bookings and leads', frontdesk: 'Leads and bookings only' };
-  viewEl.innerHTML = `<div class="ad-head"><div><h1>Staff</h1><p>Give each person their own sign-in. Roles: owner (${roleHelp.owner.toLowerCase()}), manager (${roleHelp.manager.toLowerCase()}), front desk (${roleHelp.frontdesk.toLowerCase()}).</p></div>
+  const roleHelp = { owner: 'everything, including staff and settings', manager: 'inventory, rates, bookings and leads', frontdesk: 'leads and bookings only' };
+  viewEl.innerHTML = `<div class="ad-head"><div><h1>Staff</h1><p>Give each person their own sign-in. Owner: ${roleHelp.owner}. Manager: ${roleHelp.manager}. Front desk: ${roleHelp.frontdesk}.</p></div>
       <div class="ad-actions"><button class="b b--primary" type="button" data-staff-new>${icon('plus')}Add staff</button></div></div>
     <div class="card-w"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Last sign-in</th><th></th></tr></thead><tbody>
-    ${d.items.map((u) => `<tr><td>${esc(u.name)}${u.isActive ? '' : ' <span class="pill">Off</span>'}</td><td>${esc(u.email)}</td><td>${esc(u.role)}</td><td class="meta">${when(u.lastLoginAt) || 'never'}</td><td><button class="b b--sm" data-staff-edit="${u.id}">Edit</button></td></tr>`).join('')}
+    ${d.items.map((u) => `<tr><td>${esc(u.name)}${u.isActive ? '' : ' <span class="pill">Off</span>'}${u.invited && u.isActive ? ' <span class="pill pill--new">Invited</span>' : ''}</td><td>${esc(u.email)}</td><td>${esc(u.role)}</td><td class="meta">${when(u.lastLoginAt) || 'never'}</td>
+      <td class="row__actions"><button class="b b--sm" data-staff-edit="${u.id}">Edit</button>${u.isActive && u.id !== me.id ? `<button class="b b--sm" data-staff-link="${u.id}">${u.invited ? 'Resend invite' : 'Send reset link'}</button>` : ''}</td></tr>`).join('')}
     </tbody></table></div></div>`;
-  $('[data-staff-new]').addEventListener('click', () => staffDialog(null, d.roles));
-  $$('[data-staff-edit]').forEach((b) => b.addEventListener('click', () => staffDialog(d.items.find((u) => u.id === Number(b.dataset.staffEdit)), d.roles)));
+  $('[data-staff-new]').addEventListener('click', () => staffDialog(null, d.roles, d.mailEnabled));
+  $$('[data-staff-edit]').forEach((b) => b.addEventListener('click', () => staffDialog(d.items.find((u) => u.id === Number(b.dataset.staffEdit)), d.roles, d.mailEnabled)));
+  $$('[data-staff-link]').forEach((b) => b.addEventListener('click', async () => {
+    const u = d.items.find((x) => x.id === Number(b.dataset.staffLink));
+    try {
+      const out = await api('POST', `/staff/${u.id}/link`, {});
+      if (out.emailed) toast(`Link emailed to ${u.email}`);
+      else linkDialog(u, out.link);
+    } catch (x) { toast(x.message, true); }
+  }));
 };
-function staffDialog(u, roles) {
-  openDialog(`${dlgHead(u ? `Edit ${esc(u.name)}` : 'Add staff')}
-    <form data-staff-form><div class="dlg__body"><div class="fgrid">
-      ${u ? '' : '<label class="f"><span>Name</span><input class="inp" name="name" required></label><label class="f"><span>Email</span><input class="inp" type="email" name="email" required></label>'}
-      <label class="f"><span>Role</span><select class="sel" name="role">${roles.map((r) => `<option value="${r}" ${u?.role === r ? 'selected' : ''}>${r}</option>`).join('')}</select></label>
-      <label class="f"><span>${u ? 'New password (optional)' : 'Password'}</span><input class="inp" type="password" name="password" minlength="10" autocomplete="new-password" ${u ? '' : 'required'}><small class="hint">At least 10 characters. Share it privately.</small></label>
-      ${u ? `<label class="check full"><input type="checkbox" name="isActive" ${u.isActive ? 'checked' : ''}> Can sign in</label>` : ''}
-    </div><p class="note-box bad" data-err hidden></p></div>
-    <div class="dlg__foot"><button class="b" type="button" data-close>Cancel</button><button class="b b--primary" type="submit">Save</button></div></form>`, (dlg) => {
-    $('[data-staff-form]', dlg).addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const b = Object.fromEntries(new FormData(e.target));
-      if (u) { b.isActive = e.target.isActive.checked; if (!b.password) delete b.password; }
-      try { await api(u ? 'PATCH' : 'POST', u ? `/staff/${u.id}` : '/staff', b); dialog.close(); toast('Saved'); refresh(); } catch (x) { const n = $('[data-err]', dlg); n.textContent = x.message; n.hidden = false; }
+
+function linkDialog(u, link) {
+  openDialog(`${dlgHead(`Sign-in link for ${esc(u.name)}`)}
+    <div class="dlg__body">
+      <p>Email is not set up yet, so send this link to ${esc(u.name)} yourself (WhatsApp is fine). It works once, lets them choose their own password, and expires in ${u.invited ? '7 days' : '30 minutes'}.</p>
+      <div class="copy-row"><input class="inp" readonly value="${esc(link)}" data-link-inp aria-label="Sign-in link"><button class="b" type="button" data-copy>Copy</button></div>
+    </div>
+    <div class="dlg__foot"><button class="b b--primary" type="button" data-close>Done</button></div>`, (dlg) => {
+    $('[data-copy]', dlg).addEventListener('click', async () => {
+      const inp = $('[data-link-inp]', dlg);
+      try { await navigator.clipboard.writeText(inp.value); toast('Link copied'); } catch { inp.select(); document.execCommand('copy'); toast('Link copied'); }
     });
   });
 }
 
-function passwordDialog() {
-  openDialog(`${dlgHead('Change your password')}
-    <form data-pw-form><div class="dlg__body"><div class="fgrid">
-      <label class="f full"><span>Current password</span><input class="inp" type="password" name="current" autocomplete="current-password" required></label>
-      <label class="f full"><span>New password</span><input class="inp" type="password" name="next" minlength="10" autocomplete="new-password" required></label>
+function staffDialog(u, roles, mailEnabled) {
+  openDialog(`${dlgHead(u ? `Edit ${esc(u.name)}` : 'Add staff')}
+    <form data-staff-form novalidate><div class="dlg__body"><div class="fgrid">
+      ${u ? '' : '<label class="f"><span>Name</span><input class="inp" name="name" required></label><label class="f"><span>Work email</span><input class="inp" type="email" name="email" required></label>'}
+      <label class="f"><span>Role</span><select class="sel" name="role">${roles.map((r) => `<option value="${r}" ${(u?.role || 'frontdesk') === r ? 'selected' : ''}>${r === 'frontdesk' ? 'Front desk' : r[0].toUpperCase() + r.slice(1)}</option>`).join('')}</select></label>
+      ${u ? '' : `<div class="f full"><span>How do they get their password?</span>
+        <label class="check"><input type="radio" name="how" value="invite" checked> ${mailEnabled ? 'Email them an invite link to choose their own' : 'Give me an invite link to send them (they choose their own password)'}</label>
+        <label class="check"><input type="radio" name="how" value="password"> I will set a password now and tell them privately</label></div>`}
+      <label class="f" data-pw-field ${u ? '' : 'hidden'}><span>${u ? 'New password (optional)' : 'Password'}</span><input class="inp" type="password" name="password" minlength="10" autocomplete="new-password"><small class="hint">At least 10 characters.${u ? ' Setting one signs them out everywhere.' : ''}</small></label>
+      ${u ? `<label class="check full"><input type="checkbox" name="isActive" ${u.isActive ? 'checked' : ''} ${u.id === me.id ? 'disabled' : ''}> Can sign in</label>` : ''}
     </div><p class="note-box bad" data-err hidden></p></div>
-    <div class="dlg__foot"><button class="b" type="button" data-close>Cancel</button><button class="b b--primary" type="submit">Change password</button></div></form>`, (dlg) => {
+    <div class="dlg__foot"><button class="b" type="button" data-close>Cancel</button><button class="b b--primary" type="submit">${u ? 'Save' : 'Add staff'}</button></div></form>`, (dlg) => {
+    const f = $('[data-staff-form]', dlg);
+    $$('[name=how]', f).forEach((r) => r.addEventListener('change', () => ($('[data-pw-field]', f).hidden = f.how.value !== 'password')));
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const b = Object.fromEntries(new FormData(f));
+      if (u) { b.isActive = f.isActive.checked; if (!b.password) delete b.password; }
+      else { b.invite = b.how === 'invite'; delete b.how; if (b.invite) delete b.password; }
+      try {
+        const out = await api(u ? 'PATCH' : 'POST', u ? `/staff/${u.id}` : '/staff', b);
+        dialog.close();
+        if (out.link) linkDialog({ name: b.name, invited: true }, out.link);
+        else toast(b.invite ? `Invite emailed to ${b.email}` : 'Saved');
+        refresh();
+      } catch (x) { const n = $('[data-err]', dlg); n.textContent = x.message; n.hidden = false; }
+    });
+  });
+}
+
+/* ================= My account ================= */
+async function accountDialog() {
+  const s = await api('GET', '/me/sessions').catch(() => ({ items: [] }));
+  const device = (ua) => (/iphone|android|mobile/i.test(ua || '') ? 'Phone' : /ipad|tablet/i.test(ua || '') ? 'Tablet' : 'Computer') + (/(edg|chrome|safari|firefox)/i.exec(ua || '') ? `, ${/(edg|chrome|firefox|safari)/i.exec(ua)[1].replace(/edg/i, 'Edge')}` : '');
+  openDialog(`${dlgHead('My account')}
+    <div class="dlg__body">
+      <p class="meta">${esc(me.name)} &middot; ${esc(me.email)} &middot; ${esc(me.role)}</p>
+      <form data-pw-form class="fgrid">
+        <label class="f full"><span>Current password</span><input class="inp" type="password" name="current" autocomplete="current-password" required></label>
+        <label class="f"><span>New password</span><input class="inp" type="password" name="next" minlength="10" autocomplete="new-password" required></label>
+        <label class="f"><span>Type it again</span><input class="inp" type="password" name="confirm" minlength="10" autocomplete="new-password" required></label>
+        <div class="full"><button class="b b--primary" type="submit">Change password</button> <span class="meta">Other devices will be signed out.</span></div>
+        <p class="note-box bad full" data-err hidden></p>
+      </form>
+      <section><h3 class="f"><span>Signed in on</span></h3>
+        <div class="mini">${s.items.map((x) => `<div><span>${device(x.device)}${x.current ? ' <span class="pill pill--booked">This device</span>' : ''}</span><span class="meta">since ${when(x.created_at)}${x.remember ? ', kept signed in' : ''}</span></div>`).join('') || '<p class="meta">No sessions.</p>'}</div>
+        <button class="b mt-s" type="button" data-everywhere>Sign out of all devices</button>
+      </section>
+    </div>`, (dlg) => {
     $('[data-pw-form]', dlg).addEventListener('submit', async (e) => {
       e.preventDefault();
-      try { await api('POST', '/me/password', Object.fromEntries(new FormData(e.target))); dialog.close(); toast('Password changed. Please sign in again.'); signOut(); } catch (x) { const n = $('[data-err]', dlg); n.textContent = x.message; n.hidden = false; }
+      const b = Object.fromEntries(new FormData(e.target));
+      const err = $('[data-err]', dlg);
+      if (b.next !== b.confirm) { err.textContent = 'The two new passwords do not match.'; err.hidden = false; return; }
+      try { await api('POST', '/me/password', { current: b.current, next: b.next }); dialog.close(); toast('Password changed. Other devices are signed out.'); } catch (x) { err.textContent = x.message; err.hidden = false; }
+    });
+    $('[data-everywhere]', dlg).addEventListener('click', async () => {
+      if (!confirm('Sign out of every device, including this one?')) return;
+      dialog.close();
+      signOut(true);
     });
   });
 }
 
-if (store.get()) start();
-else $('[data-login-view]').hidden = false;
+if (linkToken) openLink(linkToken);
+else start();

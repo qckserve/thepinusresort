@@ -16,7 +16,7 @@ if (prod) {
   if (!existsSync(dist)) throw new Error('dist/ is missing. Run "npm run build" first.');
 
   // Old WordPress links, including the misspelt one in the old footer.
-  const redirects = { '/accomodation': '/accommodation/', '/accomodation/': '/accommodation/', '/home': '/', '/home/': '/' };
+  const redirects = { '/accomodation': '/accommodation/', '/accomodation/': '/accommodation/', '/home': '/', '/home/': '/', '/login': '/admin/', '/staff': '/admin/' };
   app.use((req, res, next) => {
     const to = redirects[req.path.toLowerCase()];
     if (to) return res.redirect(301, to);

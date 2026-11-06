@@ -12,6 +12,16 @@
   ],
   "redirects": [
     {
+      "source": "/login",
+      "destination": "/admin/",
+      "permanent": false
+    },
+    {
+      "source": "/staff",
+      "destination": "/admin/",
+      "permanent": false
+    },
+    {
       "source": "/accomodation",
       "destination": "/accommodation/",
       "permanent": true
