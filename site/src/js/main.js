@@ -1,4 +1,5 @@
 // Shared behaviour for every page. No framework: small, fast, progressive.
+import './pickers.js';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;

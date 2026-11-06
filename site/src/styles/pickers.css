@@ -1,0 +1,126 @@
+/* Branded date range picker and dropdown (public site). Uses the tokens from main.css. */
+
+/* The real controls stay in the form, just out of sight. */
+.pk-native { position: absolute !important; width: 1px !important; height: 1px !important; opacity: 0 !important; pointer-events: none !important; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ---------- Triggers (look like the field they replace) ---------- */
+.pk-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+  background: transparent;
+}
+.pk-trigger .pk-val { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pk-trigger .pk-val.is-empty { color: #9a9d95; }
+.pk-ico { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.pk-trigger .pk-ico { color: var(--wood); transition: transform .25s var(--ease); }
+.pk-select[aria-expanded='true'] .pk-ico { transform: rotate(180deg); }
+
+/* In the home page booking bar */
+.booking__field .pk-trigger { min-height: 34px; padding: 0; font-family: var(--sans); font-size: 1rem; font-weight: 500; }
+.booking__field:has(.pk-trigger[aria-expanded='true']) { background: var(--paper); }
+
+/* In the reservation form */
+.field .pk-trigger { min-height: 46px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 16px; transition: border-color .2s; }
+.field .pk-trigger:hover, .field .pk-trigger[aria-expanded='true'] { border-bottom-color: var(--ink); }
+.field.is-invalid .pk-trigger { border-bottom-color: #a4442f; }
+.pk-trigger:focus-visible { outline: 2px solid var(--wood); outline-offset: 3px; }
+
+/* ---------- Popover ---------- */
+.pk-pop {
+  position: absolute;
+  z-index: 75;
+  background: var(--white);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 60px -28px rgba(20, 29, 26, 0.45);
+  font-family: var(--sans);
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  animation: pk-in .18s var(--ease);
+}
+.pk-pop[hidden] { display: none; }
+@keyframes pk-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.pk-scrim { position: fixed; inset: 0; z-index: 74; background: rgba(20, 29, 26, 0.45); }
+.pk-scrim[hidden] { display: none; }
+html.pk-lock { overflow: hidden; }
+
+/* Phone: bottom sheet */
+.pk-pop.pk-sheet { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: auto; max-width: none; max-height: 88vh; overflow-y: auto; border: 0; border-top: 3px solid var(--olive); animation: pk-up .25s var(--ease); padding-bottom: env(safe-area-inset-bottom); }
+@keyframes pk-up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ---------- Calendar ---------- */
+.pk-cal { padding: 18px 20px 14px; }
+.pk-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--sand); }
+.pk-label { font-size: 13px; color: var(--muted); }
+.pk-steps { display: flex; align-items: center; gap: 10px; }
+.pk-step { display: grid; text-align: left; padding: 6px 12px 7px; border: 1px solid var(--line); font-size: 14px; font-weight: 500; color: var(--ink); min-width: 132px; transition: border-color .2s, background .2s; }
+.pk-step small { font-size: 10.5px; font-weight: 500; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+.pk-step.is-on { border-color: var(--pine-800); background: var(--paper); box-shadow: inset 0 -2px 0 var(--olive); }
+.pk-step:disabled { opacity: .5; cursor: default; }
+.pk-arrow { color: var(--wood); display: grid; }
+.pk-close { width: 36px; height: 36px; display: grid; place-items: center; font-size: 26px; line-height: 1; color: var(--muted); flex: none; }
+.pk-close:hover { color: var(--ink); }
+
+.pk-body { position: relative; padding-top: 12px; }
+.pk-months { display: flex; gap: 28px; }
+.pk-month { width: 294px; flex: none; }
+.pk-sheet .pk-month { width: 100%; flex: 1; }
+.pk-mtitle { text-align: center; font-family: var(--serif); font-size: 1.35rem; font-weight: 500; line-height: 40px; height: 40px; }
+.pk-nav { position: absolute; top: 12px; width: 40px; height: 40px; display: grid; place-items: center; color: var(--ink); border: 1px solid transparent; z-index: 1; }
+.pk-nav:hover:not(:disabled) { border-color: var(--line); background: var(--paper); }
+.pk-nav:disabled { opacity: .25; cursor: default; }
+.pk-prev { left: -6px; }
+.pk-next { right: -6px; }
+.pk-grid { border-collapse: collapse; width: 100%; table-layout: fixed; margin-top: 6px; }
+.pk-grid th { font-size: 11px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding: 6px 0 8px; text-align: center; }
+.pk-grid td { padding: 2px 0; text-align: center; }
+.pk-day {
+  position: relative;
+  width: 100%;
+  min-width: 40px;
+  height: 42px;
+  font-size: 14px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  transition: background .12s, color .12s;
+}
+.pk-day:hover:not(:disabled) { background: var(--cream); }
+.pk-day:disabled { color: #c6c2b6; cursor: default; text-decoration: line-through; text-decoration-color: rgba(198, 194, 182, .6); }
+.pk-day.is-today::after { content: ''; position: absolute; left: 50%; bottom: 6px; width: 4px; height: 4px; border-radius: 50%; background: var(--wood); transform: translateX(-50%); }
+.pk-day.is-range { background: var(--cream); color: var(--pine-900); }
+.pk-day.is-start, .pk-day.is-end { background: var(--pine-800); color: var(--white); }
+.pk-day.is-start::after, .pk-day.is-end::after { background: var(--cream); }
+.pk-day.is-preview { background: var(--olive); }
+.pk-day:focus-visible { outline: 2px solid var(--wood); outline-offset: -2px; z-index: 1; }
+
+.pk-foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--sand); }
+.pk-sum { font-size: 13.5px; color: var(--muted); }
+.pk-sum b { color: var(--ink); font-weight: 600; }
+.pk-done { font-size: 12px; font-weight: 500; letter-spacing: .18em; text-transform: uppercase; color: var(--white); background: var(--olive); padding: 10px 20px; min-height: 40px; transition: background .2s; }
+.pk-done:hover { background: var(--olive-dark); }
+
+@media (max-width: 639px) {
+  .pk-cal { padding: 16px 16px 12px; }
+  .pk-steps { flex: 1; }
+  .pk-step { flex: 1; min-width: 0; }
+  .pk-day { height: 44px; min-width: 0; }
+}
+
+/* ---------- Dropdown list ---------- */
+.pk-list { list-style: none; margin: 0; padding: 6px 0; max-height: 320px; overflow-y: auto; outline: none; }
+.pk-opt { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 18px; font-size: 15px; cursor: pointer; border-left: 2px solid transparent; }
+.pk-opt.is-active { background: var(--paper); border-left-color: var(--olive); }
+.pk-opt[aria-selected='true'] { font-weight: 600; color: var(--pine-900); }
+.pk-opt .pk-ico { color: var(--olive); stroke-width: 2; }
+.pk-sheet .pk-list { max-height: none; padding: 8px 0 16px; }
+.pk-sheet .pk-opt { padding: 16px 20px; font-size: 16px; }
+
+@media (prefers-reduced-motion: reduce) { .pk-pop, .pk-pop.pk-sheet { animation: none; } }
