@@ -140,7 +140,12 @@ async function start() {
   try {
     const out = await api('GET', '/me');
     me = { ...out.user, mailEnabled: out.mailEnabled, notify: out.notify };
-  } catch {
+  } catch (x) {
+    // The database is unreachable or not set up: say exactly that on the sign-in screen.
+    if (x.data?.code === 'DB_UNREACHABLE' || x.data?.code === 'NOT_CONFIGURED') {
+      showSignIn(`Cannot reach the database. ${x.message}`);
+      return;
+    }
     const st = await fetch('/api/admin/status').then((r) => r.json()).catch(() => ({}));
     $('[data-first-run]').hidden = st.hasStaff !== false;
     return showSignIn();
@@ -793,4 +798,11 @@ async function accountDialog() {
 }
 
 if (linkToken) openLink(linkToken);
-else start();
+else {
+  // Show the sign-in card straight away; it switches to the app if a session is still valid.
+  loginView.hidden = false;
+  const sub = $('[data-pane="login"] .login-sub');
+  const original = sub.textContent;
+  sub.textContent = 'Connecting...';
+  start().finally(() => { sub.textContent = original; });
+}

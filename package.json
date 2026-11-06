@@ -25,6 +25,8 @@
   },
   "devDependencies": {
     "@fontsource/cormorant-garamond": "^5.3.0",
+    "@fontsource/dm-sans": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
     "@fontsource/jost": "^5.3.0",
     "concurrently": "^10.0.6",
     "mongodb-memory-server-core": "^11.3.0",

@@ -277,6 +277,11 @@ staff.patch('/staff/:id', owner, h(async (req) => { await auth.updateStaff(req.s
 /* ---- Errors ---- */
 api.use((req, r) => r.status(404).json({ error: 'Not found' }));
 api.use((err, req, r, next) => {
+  // Database problems: staff screens get the exact fix, guests a friendly line.
+  if (err instanceof AppError && (err.code === 'DB_UNREACHABLE' || err.code === 'NOT_CONFIGURED')) {
+    const forStaff = req.originalUrl.startsWith('/api/admin');
+    return r.status(503).json({ error: forStaff ? err.message : 'The booking system is briefly unavailable. Please call or WhatsApp us.', code: err.code, ...(forStaff ? err.details || {} : {}) });
+  }
   if (err instanceof AppError) return r.status(err.status).json({ error: err.message, code: err.code, ...(err.details || {}) });
   if (err.type === 'entity.parse.failed') return r.status(400).json({ error: 'Invalid request.' });
   if (err.name === 'MongoServerSelectionError' || err.name === 'MongoNetworkError') {

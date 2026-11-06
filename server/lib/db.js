@@ -19,14 +19,39 @@ let client = null;
 
 async function connect() {
   if (!uri) throw new AppError('NOT_CONFIGURED', 'Database not configured. Set MONGODB_URI in the server settings.');
-  const c = new MongoClient(uri, { maxPoolSize: 10, serverSelectionTimeoutMS: 10_000, appName: 'thepinus' });
-  await c.connect();
+  const c = new MongoClient(uri, { maxPoolSize: 10, serverSelectionTimeoutMS: 8_000, appName: 'thepinus' });
+  try {
+    await c.connect();
+  } catch (e) {
+    await c.close().catch(() => {});
+    throw dbError(e);
+  }
   if (process.env.VERCEL) {
     // Lets Vercel Fluid Compute close idle connections cleanly when an instance is suspended.
     const { attachDatabasePool } = await import('@vercel/functions');
     attachDatabasePool(c);
   }
   return c;
+}
+
+/**
+ * Turns a connection failure into a clear reason. The message never contains the password.
+ *   auth    : wrong user name or password in MONGODB_URI
+ *   dns     : the cluster address in MONGODB_URI is wrong
+ *   network : Atlas refused or dropped the connection, usually Network Access (IP Access List)
+ */
+function dbError(e) {
+  const m = `${e?.message || ''} ${e?.cause?.message || ''} ${e?.reason?.error?.message || ''}`;
+  let reason = 'network';
+  if (/bad auth|authentication failed|auth error|SCRAM/i.test(m) || e?.code === 8000 || e?.code === 18) reason = 'auth';
+  else if (/ENOTFOUND|querySrv|EAI_AGAIN|Invalid scheme|Invalid connection string|URI must/i.test(m)) reason = 'dns';
+  console.error(`[db] cannot connect (${reason}): ${m.replace(/\/\/[^@\s]+@/g, '//<user>:<password>@').trim().slice(0, 300)}`);
+  const help = {
+    auth: 'MongoDB rejected the user name or password in MONGODB_URI. Reset the password in Atlas (Database & Network Access > Database Users), put it in MONGODB_URI without the < >, and redeploy.',
+    dns: 'The cluster address in MONGODB_URI looks wrong. Copy it again from Atlas (Clusters > Connect > Drivers) and redeploy.',
+    network: 'MongoDB Atlas is blocking this server. In Atlas open Database & Network Access > IP Access List, add 0.0.0.0/0 (Allow access from anywhere), wait a minute and reload.',
+  }[reason];
+  return new AppError('DB_UNREACHABLE', help, { reason });
 }
 
 /** Connects once, creates indexes and seed data. Every request awaits this. */

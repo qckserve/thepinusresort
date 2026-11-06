@@ -1,12 +1,29 @@
-/* Admin dashboard (staff only). Builds on the site tokens in main.css. */
-body.admin { background: #f3efe6; font-size: 15px; }
+/* Admin dashboard (staff only). Builds on the site tokens in main.css.
+   Typeface: DM Sans for headings and numbers, Inter for everything else (self-hosted). */
+@import '@fontsource/dm-sans/latin-500.css';
+@import '@fontsource/dm-sans/latin-600.css';
+@import '@fontsource/dm-sans/latin-700.css';
+@import '@fontsource/inter/latin-400.css';
+@import '@fontsource/inter/latin-500.css';
+@import '@fontsource/inter/latin-600.css';
+
+body.admin {
+  --serif: 'DM Sans', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: #f3efe6;
+  font-family: var(--sans);
+  font-size: 14.5px;
+  line-height: 1.55;
+  font-feature-settings: 'cv11', 'ss01';
+}
+body.admin .eyebrow, body.admin .f > span, body.admin .tbl th, body.admin .kpi span, body.admin .pill, body.admin .facts-g dt { letter-spacing: 0.06em; }
 body.admin [hidden] { display: none !important; }
 .ad { display: grid; min-height: 100vh; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 1000px) { .ad { grid-template-columns: 232px minmax(0, 1fr); } }
 
 /* Sidebar */
 .ad-side { background: var(--pine-900); color: var(--on-dark); display: flex; flex-direction: column; }
-.ad-brand { display: flex; align-items: center; gap: 12px; padding: 18px 20px; font-family: var(--serif); font-size: 1.25rem; color: var(--cream); }
+.ad-brand { display: flex; align-items: center; gap: 12px; padding: 18px 20px; font-family: var(--serif); font-weight: 600; font-size: 1.05rem; letter-spacing: -0.01em; color: var(--cream); }
 .ad-brand img { height: 38px; width: auto; }
 .ad-nav { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; padding: 0 12px 12px; }
 .ad-nav::-webkit-scrollbar { display: none; }
@@ -30,7 +47,7 @@ body.admin [hidden] { display: none !important; }
 /* Main */
 .ad-main { padding: clamp(16px, 3vw, 36px); min-width: 0; }
 .ad-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; margin-bottom: 20px; }
-.ad-head h1 { font-family: var(--serif); font-weight: 500; font-size: clamp(1.8rem, 3vw, 2.4rem); line-height: 1.1; }
+.ad-head h1 { font-family: var(--serif); font-weight: 700; font-size: clamp(1.5rem, 2.4vw, 1.9rem); line-height: 1.15; letter-spacing: -0.02em; }
 .ad-head p { color: var(--muted); font-size: 14px; margin-top: 4px; }
 .ad-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .b { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; padding: 8px 16px; font-size: 13px; font-weight: 500; letter-spacing: 0.04em; border: 1px solid var(--line); background: var(--white); color: var(--ink); white-space: nowrap; transition: background .15s, border-color .15s; }
@@ -46,7 +63,7 @@ body.admin [hidden] { display: none !important; }
 
 .card-w { background: var(--white); border: 1px solid #e6dfd0; }
 .card-w + .card-w { margin-top: 16px; }
-.card-w > h2 { font-family: var(--serif); font-weight: 500; font-size: 1.35rem; padding: 16px 20px; border-bottom: 1px solid #ece6d8; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.card-w > h2 { font-family: var(--serif); font-weight: 600; font-size: 1.02rem; letter-spacing: -0.01em; padding: 16px 20px; border-bottom: 1px solid #ece6d8; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .card-w .pad { padding: 16px 20px; }
 .grid2 { display: grid; gap: 16px; }
 @media (min-width: 1100px) { .grid2 { grid-template-columns: 1fr 1fr; } .grid2 > .card-w + .card-w { margin-top: 0; } }
@@ -55,7 +72,7 @@ body.admin [hidden] { display: none !important; }
 @media (min-width: 760px) { .kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 .kpi { background: var(--white); border: 1px solid #e6dfd0; padding: 16px 18px; text-align: left; transition: border-color .15s; }
 button.kpi:hover { border-color: var(--olive); }
-.kpi b { display: block; font-family: var(--serif); font-size: 2.2rem; font-weight: 500; line-height: 1; }
+.kpi b { display: block; font-family: var(--serif); font-size: 1.9rem; font-weight: 600; line-height: 1.05; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin-bottom: 4px; }
 .kpi span { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -77,7 +94,7 @@ button.kpi:hover { border-color: var(--olive); }
 button.row { text-align: left; width: 100%; cursor: pointer; transition: border-color .15s; }
 button.row:hover { border-color: #cfc4ac; }
 .row__top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; align-items: baseline; }
-.row__name { font-family: var(--serif); font-size: 1.3rem; }
+.row__name { font-family: var(--serif); font-weight: 600; font-size: 1.05rem; letter-spacing: -0.01em; }
 .meta { font-size: 12.5px; color: var(--muted); letter-spacing: .02em; }
 .facts-g { display: grid; gap: 4px 20px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); font-size: 14px; }
 .facts-g dt { font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
@@ -104,7 +121,7 @@ button.row:hover { border-color: #cfc4ac; }
 .cal thead th.we { background: #faf6ee; }
 .cal thead th.today { box-shadow: inset 0 -2px 0 var(--wood); }
 .cal .lab { position: sticky; left: 0; z-index: 1; background: var(--white); text-align: left; padding: 6px 12px; min-width: 170px; max-width: 200px; font-size: 13px; border-right: 1px solid #e6dfd0; }
-.cal .lab b { font-family: var(--serif); font-size: 1.15rem; font-weight: 500; display: block; }
+.cal .lab b { font-family: var(--serif); font-size: 0.98rem; font-weight: 600; display: block; }
 .cal .lab small { color: var(--muted); font-size: 11.5px; }
 .cal tr.rt-head td { background: #f7f3ea; height: 34px; }
 .cal td button { width: 100%; height: 100%; min-height: 40px; display: grid; place-items: center; font-size: 13px; }
@@ -146,7 +163,7 @@ button.row:hover { border-color: #cfc4ac; }
 dialog.dlg { border: 0; padding: 0; width: min(720px, calc(100vw - 24px)); max-height: calc(100vh - 32px); background: var(--white); color: var(--ink); box-shadow: 0 30px 80px -20px rgba(20, 29, 26, .5); }
 dialog.dlg::backdrop { background: rgba(20, 29, 26, .55); }
 .dlg__head { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 20px; border-bottom: 1px solid #ece6d8; position: sticky; top: 0; background: var(--white); z-index: 2; }
-.dlg__head h2 { font-family: var(--serif); font-weight: 500; font-size: 1.5rem; }
+.dlg__head h2 { font-family: var(--serif); font-weight: 600; font-size: 1.15rem; letter-spacing: -0.01em; }
 .dlg__head button { width: 40px; height: 40px; display: grid; place-items: center; }
 .dlg__body { padding: 18px 20px; display: grid; gap: 16px; }
 .dlg__foot { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; padding: 14px 20px; border-top: 1px solid #ece6d8; position: sticky; bottom: 0; background: var(--white); }
@@ -163,7 +180,7 @@ dialog.dlg::backdrop { background: rgba(20, 29, 26, .55); }
 .login-wrap { min-height: 100vh; display: grid; place-items: center; padding: 16px; background: var(--pine-900); }
 .login-card { background: var(--white); width: min(420px, 100%); padding: 32px; display: grid; gap: 16px; }
 .login-card img { height: 72px; width: auto; justify-self: center; }
-.login-card h1 { font-family: var(--serif); font-weight: 500; font-size: 1.8rem; text-align: center; }
+.login-card h1 { font-family: var(--serif); font-weight: 700; font-size: 1.45rem; letter-spacing: -0.02em; text-align: center; }
 
 /* Sign-in screens */
 .login-card { gap: 0; }
@@ -180,3 +197,8 @@ dialog.dlg::backdrop { background: rgba(20, 29, 26, .55); }
 button.lnk { background: none; border: 0; cursor: pointer; padding: 4px 0; }
 .copy-row { display: flex; gap: 8px; }
 .copy-row .inp { font-size: 12.5px; }
+
+/* Numbers line up in tables and the calendar */
+.cal, .tbl, .facts-g, .summary { font-variant-numeric: tabular-nums; }
+.cal { font-size: 12.5px; }
+.b { letter-spacing: 0.01em; }
