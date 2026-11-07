@@ -712,3 +712,29 @@ a.contact-card:hover { background: var(--paper); }
 .stepper input { min-width: 0; }
 .filters button { min-width: 44px; }
 .booking__field select, .booking__field input { min-height: 44px; }
+
+/* ---------- About: brand page ---------- */
+.subnav { position: sticky; top: var(--header-h); z-index: 30; background: var(--white); border-bottom: 1px solid var(--sand); }
+.subnav__inner { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-block: 12px; }
+.subnav__inner::-webkit-scrollbar { display: none; }
+.subnav a { flex: none; font-size: 13px; font-weight: 500; padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); transition: background .2s, color .2s, border-color .2s; }
+.subnav a:hover { border-color: var(--pine-800); background: var(--pine-800); color: var(--cream); }
+@media (min-width: 960px) { .subnav__inner { justify-content: center; } }
+
+.promises { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+@media (min-width: 700px) { .promises { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1080px) { .promises { grid-template-columns: repeat(3, 1fr); } }
+.promise { background: var(--white); padding: clamp(28px, 3.5vw, 44px); display: flex; flex-direction: column; gap: 12px; }
+.promise .icon { width: 36px; height: 36px; color: var(--wood); stroke-width: 1.1; }
+.promise h3 { font-family: var(--serif); font-size: 1.65rem; font-weight: 500; line-height: 1.15; margin-top: 6px; }
+.promise p { color: var(--muted); font-size: 15px; flex: 1; }
+.promise .link-u { align-self: flex-start; margin-top: 6px; }
+
+.next-step { position: relative; display: block; overflow: hidden; aspect-ratio: 16 / 10; background: var(--pine-900); color: var(--white); }
+.next-step img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .55; transition: transform 1.2s var(--ease), opacity .4s; }
+.next-step:hover img { transform: scale(1.04); opacity: .45; }
+.next-step__body { position: absolute; left: 0; right: 0; bottom: 0; padding: clamp(22px, 3vw, 36px); display: grid; gap: 8px; background: linear-gradient(transparent, rgba(20, 29, 26, .75)); }
+.next-step .eyebrow { color: var(--cream); }
+.next-step__title { font-family: var(--serif); font-size: clamp(1.8rem, 3vw, 2.4rem); line-height: 1.1; }
+.next-step .link-u { justify-self: start; color: var(--cream); }
+.subnav ~ section[id] { scroll-margin-top: calc(var(--header-h) + 64px); }
