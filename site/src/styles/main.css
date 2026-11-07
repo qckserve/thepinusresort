@@ -738,3 +738,5 @@ a.contact-card:hover { background: var(--paper); }
 .next-step__title { font-family: var(--serif); font-size: clamp(1.8rem, 3vw, 2.4rem); line-height: 1.1; }
 .next-step .link-u { justify-self: start; color: var(--cream); }
 .subnav ~ section[id] { scroll-margin-top: calc(var(--header-h) + 64px); }
+@media (min-width: 1080px) { .promises--4 { grid-template-columns: repeat(4, 1fr); } }
+.quote cite .link-u { margin-left: 8px; }
