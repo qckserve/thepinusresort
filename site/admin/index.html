@@ -67,5 +67,24 @@
 
   <dialog class="dlg" data-dialog></dialog>
   <div class="toast" role="status" aria-live="polite" data-toast></div>
+  <!-- If the admin script cannot load (e.g. an old cached copy of this page after an update),
+       reload once with a fresh copy, then offer a button instead of leaving a blank page. -->
+  <script>
+    setTimeout(function () {
+      var login = document.querySelector('[data-login-view]');
+      var app = document.querySelector('[data-app]');
+      if (!login.hidden || !app.hidden) return;
+      var key = 'pinus-admin-reloaded';
+      try {
+        if (!sessionStorage.getItem(key)) { sessionStorage.setItem(key, '1'); location.replace('/admin/?v=' + Date.now()); return; }
+        sessionStorage.removeItem(key);
+      } catch (e) {}
+      var box = document.createElement('div');
+      box.className = 'login-wrap';
+      box.innerHTML = '<div class="login-card"><h1>The admin did not load</h1><p class="meta" style="text-align:center">It was probably just updated. Reload to get the latest version.</p><button class="b b--primary" type="button">Reload</button></div>';
+      box.querySelector('button').onclick = function () { location.replace('/admin/?v=' + Date.now()); };
+      document.body.appendChild(box);
+    }, 8000);
+  </script>
 </body>
 </html>

@@ -192,7 +192,7 @@ function setupDates(form) {
       html += monthHtml(d.getFullYear(), d.getMonth(), min);
     }
     html += `</div></div>
-      <div class="pk-foot"><span class="pk-sum" aria-live="polite">${summary || (mode === 'end' ? 'Now pick the day you leave' : 'Pick the day you arrive')}</span><button type="button" class="pk-done" data-close>Done</button></div>
+      <div class="pk-foot"><span class="pk-sum" aria-live="polite">${summary || (mode === 'end' ? 'Now pick the day you leave' : end ? 'Pick the day you arrive' : 'Pick a date')}</span><button type="button" class="pk-done" data-close>Done</button></div>
     </div>`;
     pop.innerHTML = html;
     // Roving focus: one day is tabbable.
@@ -370,9 +370,11 @@ function setupSelect(sel) {
 }
 
 /* ---------- Apply to the public booking forms (not the staff admin) ---------- */
-if (!document.body.classList.contains('admin')) {
-  document.querySelectorAll('form').forEach((form) => {
-    if (form.querySelector('input[type="date"]')) setupDates(form);
-    form.querySelectorAll('.booking__field select, .field select').forEach(setupSelect);
-  });
+/** Enhance one form's date fields and dropdowns (also used for forms added later). */
+export function enhanceForm(form) {
+  if (form.dataset.pk) return;
+  form.dataset.pk = '1';
+  if (form.querySelector('input[type="date"]')) setupDates(form);
+  form.querySelectorAll('.booking__field select, .field select').forEach(setupSelect);
 }
+if (!document.body.classList.contains('admin')) document.querySelectorAll('form').forEach(enhanceForm);

@@ -18,7 +18,7 @@ const SRC = { WEBSITE: 'Website', WALK_IN: 'Walk-in', PHONE: 'Phone', WHATSAPP: 
 const ST = { CONFIRMED: 'Confirmed', CHECKED_IN: 'Checked in', CHECKED_OUT: 'Checked out', CANCELLED: 'Cancelled', NO_SHOW: 'No-show' };
 const NEXT = { CONFIRMED: ['CHECKED_IN', 'CANCELLED', 'NO_SHOW'], CHECKED_IN: ['CHECKED_OUT'], CHECKED_OUT: [], CANCELLED: [], NO_SHOW: [] };
 const LEAD = { new: 'New', contacted: 'Contacted', booked: 'Booked', lost: 'Lost' };
-const MAIL = { lead_admin: 'Lead alert (admin)', lead_guest: 'Request received (guest)', confirm_admin: 'Confirmation (admin)', confirm_guest: 'Confirmation (guest)', precheckout_admin: 'Check-out tomorrow (admin)', precheckout_guest: 'Check-out tomorrow (guest)', review_admin: 'Review request (admin copy)', review_guest: 'Review request (guest)' };
+const MAIL = { lead_admin: 'Lead alert (admin)', lead_guest: 'Request received (guest)', confirm_admin: 'Confirmation (admin)', confirm_guest: 'Confirmation (guest)', precheckout_admin: 'Check-out tomorrow (admin)', precheckout_guest: 'Check-out tomorrow (guest)', review_admin: 'Review request (admin copy)', review_guest: 'Review request (guest)', activity_confirm_admin: 'Experience confirmed (admin)', activity_confirm_guest: 'Experience confirmed (guest)', staff_invite: 'Staff invite', staff_reset: 'Password reset link' };
 const RANK = { frontdesk: 1, manager: 2, owner: 3 };
 
 let me = null;
@@ -249,7 +249,8 @@ RENDER.today = async () => {
       <section class="card-w"><h2>Arriving today</h2><div class="pad">${d.arrivals.length ? `<div class="mini">${d.arrivals.map((r) => `<div><span><b>${esc(r.guest_name)}</b> <span class="meta">${r.rooms} x ${esc(r.room_name)}, ${nights(r.check_in, r.check_out)}N</span></span><span class="row__actions"><button class="b b--sm" data-open-res="${r.id}">Open</button><button class="b b--sm b--primary" data-status="${r.id}:CHECKED_IN">Check in</button></span></div>`).join('')}</div>` : '<p class="meta">No arrivals today.</p>'}</div></section>
       <section class="card-w"><h2>Leaving today</h2><div class="pad">${d.departures.length ? `<div class="mini">${d.departures.map((r) => `<div><span><b>${esc(r.guest_name)}</b> <span class="meta">${esc(r.reference)}${r.amount_minor != null ? `, balance ${inr(r.amount_minor - (r.advance_minor || 0))}` : ''}</span></span><span class="row__actions"><button class="b b--sm" data-open-res="${r.id}">Open</button>${r.status === 'CHECKED_IN' ? `<button class="b b--sm b--primary" data-status="${r.id}:CHECKED_OUT">Check out</button>` : ''}</span></div>`).join('')}</div>` : '<p class="meta">No departures today.</p>'}</div></section>
     </div>
-    <section class="card-w" style="margin-top:16px"><h2>New leads <button class="b b--sm" data-jump="leads">All leads</button></h2><div class="pad">${d.leads.length ? `<div class="mini">${d.leads.map((l) => `<div><span><b>${esc(l.name)}</b> <span class="meta">${esc(l.ref)} &middot; ${l.kind === 'booking' ? `${dt(l.check_in)} to ${dt(l.check_out)}, ${guests(l.adults, l.children)}` : 'Message'} &middot; ${when(l.created_at)}</span></span><span class="row__actions"><a class="b b--sm" href="https://wa.me/${wa(l.phone)}" target="_blank" rel="noopener">WhatsApp</a>${l.kind === 'booking' ? `<button class="b b--sm b--primary" data-confirm-lead="${l.id}">Confirm booking</button>` : ''}</span></div>`).join('')}</div>` : '<p class="meta">No new leads. Nice and tidy.</p>'}</div></section>`;
+    ${d.experiences?.length ? `<section class="card-w" style="margin-top:16px"><h2>Experiences today and tomorrow</h2><div class="pad"><div class="mini">${d.experiences.map((x) => `<div><span><b>${esc(x.activity_name)}</b> <span class="meta">${x.confirmed.date === d.today ? 'Today' : 'Tomorrow'}${x.confirmed.time ? `, ${esc(x.confirmed.time)}` : ''} &middot; ${esc(x.name)}, ${guests(x.confirmed.adults, x.confirmed.children)}${x.confirmed.meeting ? ` &middot; ${esc(x.confirmed.meeting)}` : ''}</span></span><span class="row__actions"><a class="b b--sm" href="tel:${esc(x.phone)}">Call</a><a class="b b--sm" href="https://wa.me/${wa(x.phone)}" target="_blank" rel="noopener">WhatsApp</a></span></div>`).join('')}</div></div></section>` : ''}
+    <section class="card-w" style="margin-top:16px"><h2>New leads <button class="b b--sm" data-jump="leads">All leads</button></h2><div class="pad">${d.leads.length ? `<div class="mini">${d.leads.map((l) => `<div><span><b>${esc(l.name)}</b> <span class="meta">${esc(l.ref)} &middot; ${l.kind === 'booking' ? `${dt(l.check_in)} to ${dt(l.check_out)}, ${guests(l.adults, l.children)}` : l.kind === 'activity' ? `${esc(l.activity_name)}, ${dt(l.check_in)}, ${guests(l.adults, l.children)}` : 'Message'} &middot; ${when(l.created_at)}</span></span><span class="row__actions"><a class="b b--sm" href="https://wa.me/${wa(l.phone)}" target="_blank" rel="noopener">WhatsApp</a>${l.kind === 'booking' ? `<button class="b b--sm b--primary" data-confirm-lead="${l.id}">Confirm booking</button>` : l.kind === 'activity' ? `<button class="b b--sm b--primary" data-confirm-activity="${l.id}">Confirm experience</button>` : ''}</span></div>`).join('')}</div>` : '<p class="meta">No new leads. Nice and tidy.</p>'}</div></section>`;
   todayLeads = d.leads;
 };
 let todayLeads = [];
@@ -268,45 +269,59 @@ viewEl.addEventListener('click', async (e) => {
     const lead = [...todayLeads, ...leadItems].find((l) => l.id === Number(cl.dataset.confirmLead));
     if (lead) bookingForm({ lead });
   }
+  const ca = e.target.closest('[data-confirm-activity]');
+  if (ca) {
+    const lead = [...todayLeads, ...leadItems].find((l) => l.id === Number(ca.dataset.confirmActivity));
+    if (lead) activityConfirmDialog(lead);
+  }
 });
 
 /* ================= Leads ================= */
 let leadStatus = '';
+let leadKind = '';
+const KIND = { '': 'All types', booking: 'Stays', activity: 'Experiences', contact: 'Messages' };
 let leadItems = [];
 RENDER.leads = async () => {
   const q = $('[data-lead-q]')?.value || '';
   const p = new URLSearchParams();
   if (leadStatus) p.set('status', leadStatus);
+  if (leadKind) p.set('kind', leadKind);
   if (q) p.set('q', q);
   const d = await api('GET', `/enquiries?${p}`);
   leadItems = d.items;
   renderNav({ leads: d.counts.new });
   const total = Object.values(d.counts).reduce((a, b) => a + b, 0);
   viewEl.innerHTML = `
-    <div class="ad-head"><div><h1>Leads</h1><p>Booking requests and messages from the website. Confirm a booking to block the rooms and email the guest.</p></div>
+    <div class="ad-head"><div><h1>Leads</h1><p>Stay requests, experience requests and messages from the website. Confirm a stay to block the rooms, or an experience to send its confirmation; the guest is emailed either way.</p></div>
       <div class="ad-actions"><button class="b" type="button" data-csv="/enquiries.csv">Export CSV</button></div></div>
+    <div class="toolbar"><div class="chips" data-lead-kinds>${Object.entries(KIND).map(([k, v]) => `<button type="button" class="chip" data-lk="${k}" aria-pressed="${k === leadKind}">${v}</button>`).join('')}</div></div>
     <div class="toolbar"><div class="chips" data-lead-chips>${['', ...d.statuses].map((s) => `<button type="button" class="chip" data-ls="${s}" aria-pressed="${s === leadStatus}">${s ? LEAD[s] : 'All'} <b>${s ? d.counts[s] : total}</b></button>`).join('')}</div>
       <input class="inp search" type="search" placeholder="Search name, phone, ref" data-lead-q value="${esc(q)}" aria-label="Search leads"></div>
     <div class="rows">${d.items.length ? d.items.map(leadRow).join('') : '<p class="empty">No leads here.</p>'}</div>`;
   $('[data-lead-chips]').addEventListener('click', (e) => { const b = e.target.closest('[data-ls]'); if (b) { leadStatus = b.dataset.ls; refresh(); } });
+  $('[data-lead-kinds]').addEventListener('click', (e) => { const b = e.target.closest('[data-lk]'); if (b) { leadKind = b.dataset.lk; refresh(); } });
   const qi = $('[data-lead-q]');
   qi.addEventListener('input', () => { clearTimeout(qi.t); qi.t = setTimeout(async () => { await RENDER.leads(); const n = $('[data-lead-q]'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 300); });
 };
 function leadRow(l) {
   const booking = l.kind === 'booking';
+  const activity = l.kind === 'activity';
+  const c = l.confirmed;
   return `<article class="row" data-s="${l.status}" data-lead="${l.id}">
-    <div class="row__top"><span><span class="row__name">${esc(l.name)}</span> <span class="meta">${booking ? 'Booking request' : 'Message'} &middot; ${esc(l.ref)} &middot; ${when(l.created_at)}</span></span>${pill(l.status, LEAD)}</div>
+    <div class="row__top"><span><span class="row__name">${esc(l.name)}</span> <span class="meta">${booking ? 'Stay request' : activity ? 'Experience request' : 'Message'} &middot; ${esc(l.ref)} &middot; ${when(l.created_at)}</span></span>${pill(l.status, LEAD)}</div>
     <dl class="facts-g">
       <div><dt>Phone</dt><dd><a class="lnk" href="tel:${esc(l.phone)}">${esc(l.phone)}</a></dd></div>
       ${l.email ? `<div><dt>Email</dt><dd><a class="lnk" href="mailto:${esc(l.email)}">${esc(l.email)}</a></dd></div>` : ''}
       ${booking ? `<div><dt>Stay</dt><dd>${dt(l.check_in)} to ${dt(l.check_out)} (${nights(l.check_in, l.check_out)}N)</dd></div><div><dt>Guests</dt><dd>${guests(l.adults, l.children)}, ${l.rooms} room${l.rooms > 1 ? 's' : ''}</dd></div>` : ''}
+      ${activity ? `<div><dt>Experience</dt><dd>${esc(l.activity_name)}</dd></div><div><dt>Date</dt><dd>${dty(l.check_in)}${l.slot ? `, ${esc(l.slot)}` : ''}</dd></div><div><dt>People</dt><dd>${guests(l.adults, l.children)}</dd></div>${l.stay_ref ? `<div><dt>Staying with us</dt><dd>${esc(l.stay_ref)}</dd></div>` : ''}` : ''}
     </dl>
+    ${activity && c ? `<p class="note-box ok">Confirmed for ${dty(c.date)}${c.time ? `, ${esc(c.time)}` : ''}, ${guests(c.adults, c.children)}${c.amount_minor != null ? `, ${inr(c.amount_minor)}` : ''}${c.meeting ? `. Meet: ${esc(c.meeting)}` : ''}</p>` : ''}
     ${l.message ? `<p class="msg">${esc(l.message)}</p>` : ''}
     <div class="row__actions">
-      <select class="sel" aria-label="Lead status" data-lead-status>${Object.entries(LEAD).map(([k, v]) => `<option value="${k}" ${k === l.status ? 'selected' : ''} ${k === 'booked' && !l.reservation_ref ? 'disabled' : ''}>${v}</option>`).join('')}</select>
+      <select class="sel" aria-label="Lead status" data-lead-status>${Object.entries(LEAD).map(([k, v]) => `<option value="${k}" ${k === l.status ? 'selected' : ''} ${k === 'booked' && !l.reservation_ref && !c ? 'disabled' : ''}>${v}</option>`).join('')}</select>
       <input class="inp" placeholder="Private note (quoted rate, called at 5 pm...)" value="${esc(l.notes)}" data-lead-note aria-label="Note">
       <a class="b b--sm" href="https://wa.me/${wa(l.phone)}?text=${encodeURIComponent(`Hello ${l.name.split(' ')[0]}, thank you for your enquiry (${l.ref}) at The Pinus Resort.`)}" target="_blank" rel="noopener">${icon('whatsapp')}WhatsApp</a>
-      ${l.reservation_ref ? `<button class="b b--sm" data-open-res="${l.reservation_id}">Booking ${esc(l.reservation_ref)}</button>` : booking ? `<button class="b b--sm b--primary" data-confirm-lead="${l.id}">Confirm booking</button>` : ''}
+      ${l.reservation_ref ? `<button class="b b--sm" data-open-res="${l.reservation_id}">Booking ${esc(l.reservation_ref)}</button>` : booking ? `<button class="b b--sm b--primary" data-confirm-lead="${l.id}">Confirm booking</button>` : activity ? `<button class="b b--sm ${c ? '' : 'b--primary'}" data-confirm-activity="${l.id}">${c ? 'Edit and resend confirmation' : 'Confirm experience'}</button>` : ''}
     </div>
   </article>`;
 }
@@ -397,6 +412,46 @@ function bookingForm({ lead }) {
         err.textContent = x.message;
         err.hidden = false;
       } finally { btn.disabled = false; }
+    });
+  });
+}
+
+
+/* ================= Confirm an experience ================= */
+function activityConfirmDialog(l) {
+  const c = l.confirmed || {};
+  const today = iso(new Date());
+  openDialog(`${dlgHead(`Confirm ${esc(l.activity_name)}`)}
+    <form data-act-form novalidate>
+      <div class="dlg__body">
+        <p class="note-box">${esc(l.name)} &middot; ${esc(l.ref)} &middot; asked for ${dty(l.check_in)}${l.slot ? `, ${esc(l.slot)}` : ''}, ${guests(l.adults, l.children)}. Agree the plan with the guest, then confirm here; they get a confirmation email.</p>
+        <div class="fgrid">
+          <label class="f"><span>Date</span><input class="inp" type="date" name="date" min="${today}" value="${esc(c.date || l.check_in)}" required></label>
+          <label class="f"><span>Time</span><input class="inp" name="time" value="${esc(c.time || l.slot || '')}" placeholder="e.g. 7:00 am pick-up"></label>
+          <label class="f"><span>Adults</span><input class="inp" type="number" name="adults" min="1" max="60" value="${c.adults ?? l.adults}"></label>
+          <label class="f"><span>Children</span><input class="inp" type="number" name="children" min="0" max="40" value="${c.children ?? (l.children || 0)}"></label>
+          <label class="f"><span>Price agreed (INR) <small class="hint">(optional)</small></span><input class="inp" type="number" name="amount" min="0" value="${c.amount_minor != null ? c.amount_minor / 100 : ''}"></label>
+          <label class="f"><span>Meeting point <small class="hint">(optional)</small></span><input class="inp" name="meeting" value="${esc(c.meeting || '')}" placeholder="Resort reception"></label>
+          <label class="f full"><span>Note to the guest <small class="hint">(optional, shown in the email)</small></span><textarea class="ta" name="note" placeholder="What to wear, what to bring, who will meet them...">${esc(c.note || '')}</textarea></label>
+        </div>
+        <label class="check"><input type="checkbox" name="sendEmail" checked> Email the confirmation to the guest and admin</label>
+        <p class="note-box bad" data-err hidden></p>
+      </div>
+      <div class="dlg__foot"><button class="b" type="button" data-close>Cancel</button><button class="b b--primary" type="submit">${l.confirmed ? 'Save and resend' : 'Confirm experience'}</button></div>
+    </form>`, (dlg) => {
+    const f = $('[data-act-form]', dlg);
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const b = Object.fromEntries(new FormData(f));
+      b.sendEmail = f.sendEmail.checked;
+      const btn = $('[type=submit]', f);
+      btn.disabled = true;
+      try {
+        await api('POST', `/enquiries/${l.id}/confirm-activity`, b);
+        dialog.close();
+        toast(b.sendEmail ? (me.mailEnabled ? 'Confirmed and emailed' : 'Confirmed (email not set up, nothing sent)') : 'Confirmed');
+        refresh();
+      } catch (x) { const n = $('[data-err]', f); n.textContent = x.message; n.hidden = false; } finally { btn.disabled = false; }
     });
   });
 }
@@ -797,6 +852,8 @@ async function accountDialog() {
   });
 }
 
+try { sessionStorage.removeItem('pinus-admin-reloaded'); } catch {}
+if (new URLSearchParams(location.search).has('v')) history.replaceState(null, '', location.pathname + location.hash);
 if (linkToken) openLink(linkToken);
 else {
   // Show the sign-in card straight away; it switches to the app if a session is still valid.

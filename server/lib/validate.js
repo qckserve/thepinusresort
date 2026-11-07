@@ -7,10 +7,14 @@ const int = (v, min, max) => {
 };
 
 export const ROOM_TYPES = ['Deluxe Room', 'Not sure yet'];
+// The experiences guests can book (same list the website shows).
+import activities from '../../data/activities.json' with { type: 'json' };
+export const ACTIVITIES = activities;
+export const activityByCode = (code) => activities.find((a) => a.code === code) || null;
 
 export function validateEnquiry(body = {}) {
   const errors = {};
-  const kind = body.kind === 'contact' ? 'contact' : 'booking';
+  const kind = ['contact', 'activity'].includes(body.kind) ? body.kind : 'booking';
   const name = clean(body.name, 120);
   const phone = clean(body.phone, 30);
   const email = clean(body.email, 160).toLowerCase();
@@ -22,7 +26,7 @@ export function validateEnquiry(body = {}) {
   const digits = phone.replace(/\D/g, '');
   if (digits.length < 10 || digits.length > 15) errors.phone = 'Please enter a valid phone number with country code.';
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) errors.email = 'Please check your email address.';
-  if (kind === 'booking' && !email) errors.email = 'Please add your email so we can send your confirmation.';
+  if (kind !== 'contact' && !email) errors.email = 'Please add your email so we can send your confirmation.';
 
   const out = { kind, name, phone, email: email || null, message: message || null, source: clean(body.source, 120) || null };
 
@@ -42,6 +46,23 @@ export function validateEnquiry(body = {}) {
     if (rooms === null) errors.rooms = 'Number of rooms should be between 1 and 20.';
     const roomType = ROOM_TYPES.includes(body.roomType) ? body.roomType : 'Not sure yet';
     Object.assign(out, { check_in: checkIn, check_out: checkOut, adults, children, rooms, room_type: roomType });
+  } else if (kind === 'activity') {
+    const act = activityByCode(clean(body.activity, 40));
+    const date = clean(body.date, 10);
+    const today = new Date().toISOString().slice(0, 10);
+    if (!act) errors.activity = 'Please choose an experience.';
+    if (!isDate(date)) errors.date = 'Please choose a date.';
+    else if (date < today) errors.date = 'The date cannot be in the past.';
+    const adults = int(body.adults, 1, act?.maxPeople || 40);
+    const children = int(body.children ?? 0, 0, 20);
+    if (adults === null) errors.adults = `Number of adults should be between 1 and ${act?.maxPeople || 40}.`;
+    if (children === null) errors.children = 'Number of children should be between 0 and 20.';
+    const slot = act && act.slots.includes(body.slot) ? body.slot : act?.slots[0] || null;
+    const stayRef = clean(body.stayRef, 20).toUpperCase() || null;
+    Object.assign(out, {
+      activity: act?.code || null, activity_name: act?.name || null, slot, stay_ref: stayRef,
+      check_in: date, check_out: null, adults, children, rooms: null, room_type: null,
+    });
   } else {
     if (!message || message.length < 5) errors.message = 'Please write a short message.';
     Object.assign(out, { check_in: null, check_out: null, adults: null, children: null, rooms: null, room_type: null });

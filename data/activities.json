@@ -1,0 +1,66 @@
+[
+  {
+    "code": "bonfire",
+    "name": "Bonfire evening",
+    "where": "On the resort lawn",
+    "slots": ["Evening"],
+    "maxPeople": 40,
+    "note": "Tell us in the afternoon and we will have the fire ready by dusk."
+  },
+  {
+    "code": "walk",
+    "name": "Pine forest walk",
+    "where": "Trails along the Lidder",
+    "slots": ["Early morning", "Morning", "Afternoon"],
+    "maxPeople": 20,
+    "note": "Easy walks of 1 to 3 hours. We will suggest a route for your group."
+  },
+  {
+    "code": "fishing",
+    "name": "Trout fishing on the Lidder",
+    "where": "Lidder river",
+    "slots": ["Morning", "Afternoon", "Full day"],
+    "maxPeople": 10,
+    "note": "Angling needs a permit from the Jammu and Kashmir Fisheries Department; we will guide you through it."
+  },
+  {
+    "code": "aru",
+    "name": "Aru Valley day trip",
+    "where": "About 14 km from the resort",
+    "slots": ["Half day", "Full day"],
+    "maxPeople": 30,
+    "note": "Meadows, forest and the start of the Kolahoi and Tarsar treks."
+  },
+  {
+    "code": "betaab",
+    "name": "Betaab Valley and Chandanwari",
+    "where": "About 17 km from the resort",
+    "slots": ["Half day", "Full day"],
+    "maxPeople": 30,
+    "note": "Often combined in one day on the Chandanwari road."
+  },
+  {
+    "code": "snow",
+    "name": "Snow day in Pahalgam",
+    "where": "Around Pahalgam, in winter",
+    "slots": ["Morning", "Afternoon", "Full day"],
+    "maxPeople": 30,
+    "note": "Winter roads change quickly; we confirm what is open on the day."
+  },
+  {
+    "code": "pony",
+    "name": "Pony ride on the meadows",
+    "where": "Meadows around Pahalgam",
+    "slots": ["Morning", "Afternoon"],
+    "maxPeople": 20,
+    "note": "With local pony operators. We confirm the route and the rate before you go."
+  },
+  {
+    "code": "trek",
+    "name": "Trek from Aru",
+    "where": "Kolahoi Glacier or Tarsar Lake, from Aru",
+    "slots": ["Multi-day"],
+    "maxPeople": 15,
+    "note": "Multi-day treks with local guides. Tell us your fitness and the days you have."
+  }
+]

@@ -1,9 +1,9 @@
 import { Router, json } from 'express';
 import { waitUntil } from '@vercel/functions';
 import { timingSafeEqual } from 'node:crypto';
-import { ready, col, nowIso, createEnquiry, listEnquiries, countByStatus, updateEnquiry, LEAD_STATUSES, getSettings } from '../lib/db.js';
+import { ready, col, nowIso, createEnquiry, listEnquiries, countByStatus, updateEnquiry, confirmActivity, LEAD_STATUSES, getSettings } from '../lib/db.js';
 import { validateEnquiry } from '../lib/validate.js';
-import { sendLeadEmails, sendConfirmation, sendPreCheckout, sendReviewRequest, sendStaffLink, mailEnabled, adminRecipients } from '../lib/mail.js';
+import { sendLeadEmails, sendActivityConfirmation, sendConfirmation, sendPreCheckout, sendReviewRequest, sendStaffLink, mailEnabled, adminRecipients } from '../lib/mail.js';
 import * as auth from '../lib/auth.js';
 import { requireStaff, ROLES } from '../lib/auth.js';
 import * as inv from '../lib/inventory.js';
@@ -146,15 +146,18 @@ staff.get('/me/sessions', desk, h(async (req) => ({ items: await auth.listSessio
 staff.post('/me/password', desk, h(async (req) => { await auth.changeOwnPassword(req.staff.id, req.body?.current, req.body?.next, req.sessionToken); return { ok: true }; }));
 
 staff.get('/dashboard', desk, h(async () => {
-  const [counts, arrivals, departures, leads] = await Promise.all([
+  const t = today();
+  const tomorrow = new Date(Date.parse(`${t}T00:00:00Z`) + 864e5).toISOString().slice(0, 10);
+  const [counts, arrivals, departures, leads, experiences] = await Promise.all([
     res.dashboardCounts(), res.listReservations({ view: 'arrivals' }), res.listReservations({ view: 'departures' }), listEnquiries({ status: 'new', limit: 8 }),
+    col('enquiries').find({ kind: 'activity', status: 'booked', 'confirmed.date': { $in: [t, tomorrow] } }).sort({ 'confirmed.date': 1, 'confirmed.time': 1 }).toArray(),
   ]);
-  return { counts, arrivals, departures, leads };
+  return { counts, arrivals, departures, leads, experiences: experiences.map(({ _id, ...x }) => ({ id: _id, ...x })), today: t };
 }));
 
 /* ---- Leads ---- */
 staff.get('/enquiries', desk, h(async (req) => {
-  const [items, counts] = await Promise.all([listEnquiries({ status: req.query.status, q: req.query.q }), countByStatus()]);
+  const [items, counts] = await Promise.all([listEnquiries({ status: req.query.status, kind: req.query.kind, q: req.query.q }), countByStatus(req.query.kind)]);
   return { items, counts, statuses: LEAD_STATUSES };
 }));
 staff.patch('/enquiries/:id', desk, h(async (req) => {
@@ -162,11 +165,16 @@ staff.patch('/enquiries/:id', desk, h(async (req) => {
   if (!row) throw new AppError('NOT_FOUND', 'Lead not found');
   return { item: row };
 }));
+staff.post('/enquiries/:id/confirm-activity', desk, h(async (req) => {
+  const item = await confirmActivity(num(req.params.id), req.staff.id, req.body || {});
+  if (req.body?.sendEmail !== false) await sendActivityConfirmation({ ...item, id: item.id });
+  return { item };
+}));
 staff.get('/enquiries.csv', desk, h(async (req, r) => {
   const items = await listEnquiries({ status: req.query.status, limit: 1000 });
   r.set('Content-Type', 'text/csv; charset=utf-8');
   r.send(res.toCsv(items, [['ref', 'Ref'], ['created_at', 'Received'], ['status', 'Status'], ['kind', 'Type'], ['name', 'Name'], ['phone', 'Phone'], ['email', 'Email'],
-    ['check_in', 'Check in'], ['check_out', 'Check out'], ['adults', 'Adults'], ['children', 'Children'], ['rooms', 'Rooms'], ['room_type', 'Room'], ['message', 'Message'], ['notes', 'Notes'], ['reservation_ref', 'Booking']]));
+    ['check_in', 'Check in'], ['check_out', 'Check out'], ['adults', 'Adults'], ['children', 'Children'], ['rooms', 'Rooms'], ['room_type', 'Room'], ['activity_name', 'Experience'], ['slot', 'Time'], ['message', 'Message'], ['notes', 'Notes'], ['reservation_ref', 'Booking']]));
 }));
 
 /* ---- Bookings ---- */

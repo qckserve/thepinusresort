@@ -78,6 +78,14 @@ Rules carried over from the inventory system: a booking takes rooms out of every
 
 Left out for now (one resort, no online payment yet): B2B supplier pulls, channel-manager webhooks, Channex / OTA sync and the paid-checkout hold. The tables keep room for them.
 
+## Booking experiences
+
+Every activity on **/activities/** has a "Book" button (bonfire evening, forest walk, trout fishing, Aru Valley, Betaab and Chandanwari, snow day, pony ride, trek). It opens a form with the branded calendar, time, people, contact details and an optional stay reference. `/activities/?book=fishing` opens it directly.
+
+- Requests arrive under **Leads** (filter: Experiences). The guest gets "We have your experience request", the admin gets an alert.
+- **Confirm experience** on the lead sets the final date, time, people, price and meeting point and emails the guest a confirmation (admin copy). Confirmed experiences for today and tomorrow show on **Today**.
+- The list of experiences (names, time options, group limits, notes) lives in `data/activities.json`, shared by the website and the server.
+
 ## Guest emails
 
 | When | Guest gets | Admin gets |

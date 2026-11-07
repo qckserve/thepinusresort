@@ -111,65 +111,120 @@ async function loadRes(id) {
 const firstName = (n) => String(n).split(' ')[0];
 
 /* ---------- 1. Booking request received (website lead) ---------- */
+const people = (a, c) => `${a} adult${a > 1 ? 's' : ''}${c ? `, ${c} child${c > 1 ? 'ren' : ''}` : ''}`;
+function activityRows(e) {
+  return [
+    ['Experience', e.activity_name],
+    ['Date', niceDate(e.check_in)],
+    ['Time', e.slot],
+    ['People', people(e.adults, e.children)],
+    ['Staying with us', e.stay_ref ? `Yes, booking ${e.stay_ref}` : ''],
+  ];
+}
+
 export async function sendLeadEmails(e) {
   const admins = await adminRecipients();
-  const isBooking = e.kind !== 'contact';
+  const isStay = e.kind === 'booking';
+  const isActivity = e.kind === 'activity';
+  const what = isStay ? 'booking request' : isActivity ? 'experience request' : 'message';
   const rows = [
     ['Request reference', e.ref],
     ['Name', e.name],
     ['Phone', e.phone],
     ['Email', e.email],
-    ...(isBooking
+    ...(isStay
       ? [
           ['Check in', niceDate(e.check_in)],
           ['Check out', `${niceDate(e.check_out)} (${daysBetween(e.check_in, e.check_out)} nights)`],
-          ['Guests', `${e.adults} adult${e.adults > 1 ? 's' : ''}${e.children ? `, ${e.children} child${e.children > 1 ? 'ren' : ''}` : ''}`],
+          ['Guests', people(e.adults, e.children)],
           ['Rooms', `${e.rooms} x ${e.room_type}`],
         ]
       : []),
+    ...(isActivity ? activityRows(e) : []),
     ['Message', e.message],
   ];
+  const headline = isActivity ? `${e.activity_name}, ${niceDate(e.check_in, { weekday: undefined })}` : isStay ? niceDate(e.check_in, { weekday: undefined }) : '';
   const jobs = [
     send({
       kind: 'lead_admin',
       to: admins,
       replyTo: e.email || undefined,
       enquiryId: e.id,
-      subject: `New ${isBooking ? 'booking request' : 'message'} ${e.ref}: ${e.name}${isBooking ? `, ${niceDate(e.check_in, { weekday: undefined })}` : ''}`,
+      subject: `New ${what} ${e.ref}: ${e.name}${headline ? `, ${headline}` : ''}`,
       html: layout({
-        preheader: `${e.name} sent a ${isBooking ? 'booking request' : 'message'} from the website`,
-        eyebrow: isBooking ? 'New booking request' : 'New message',
+        preheader: `${e.name} sent a ${what} from the website`,
+        eyebrow: `New ${what}`,
         title: e.name,
-        intro: `<p>A new ${isBooking ? 'booking request' : 'message'} came in from the website. Call or WhatsApp the guest, then confirm the booking in the admin panel so their confirmation email goes out.</p>`,
+        intro: `<p>A new ${what} came in from the website. Call or WhatsApp the guest${isActivity ? ', arrange it, then press <b>Confirm experience</b> on the lead in the admin panel' : isStay ? ', then confirm the booking in the admin panel'  : ''}${isStay || isActivity ? ' so their confirmation email goes out' : ''}.</p>`,
         rows,
         button: { href: `${BASE}/admin/`, label: 'Open admin panel' },
         after: `<p style="font:14px Arial,sans-serif"><a href="https://wa.me/${esc(e.phone.replace(/\D/g, '').replace(/^(\d{10})$/, '91$1'))}" style="color:#5d6b45">Reply on WhatsApp</a></p>`,
       }),
-      text: textOf(`New ${isBooking ? 'booking request' : 'message'} from the website`, rows, `Admin: ${BASE}/admin/`),
+      text: textOf(`New ${what} from the website`, rows, `Admin: ${BASE}/admin/`),
     }),
   ];
   if (e.email) {
-    const title = isBooking ? `Thank you, ${firstName(e.name)}` : `We have your message`;
+    const title = isStay || isActivity ? `Thank you, ${firstName(e.name)}` : 'We have your message';
+    const intro = isStay
+      ? `<p>Dear ${esc(firstName(e.name))},</p><p>Thank you for choosing The Pinus Resort. We have received your booking request and are checking availability for your dates. We will call or WhatsApp you on <b>${esc(e.phone)}</b> shortly. Once the booking is confirmed, you will receive a confirmation email from us.</p>`
+      : isActivity
+        ? `<p>Dear ${esc(firstName(e.name))},</p><p>Thank you for your request for <b>${esc(e.activity_name)}</b>. We are checking the details for your date and will call or WhatsApp you on <b>${esc(e.phone)}</b> with the plan and the price. Once it is confirmed, you will receive a confirmation email from us.</p>`
+        : `<p>Dear ${esc(firstName(e.name))},</p><p>Thank you for writing to The Pinus Resort. We will reply on <b>${esc(e.phone)}</b> or by email shortly.</p>`;
     jobs.push(send({
       kind: 'lead_guest',
       to: e.email,
       replyTo: admins[0],
       enquiryId: e.id,
-      subject: isBooking ? `We have your booking request (${e.ref}) | The Pinus Resort` : `We have your message (${e.ref}) | The Pinus Resort`,
+      subject: `We have your ${what} (${e.ref}) | The Pinus Resort`,
       html: layout({
-        preheader: isBooking ? 'We are checking availability for your dates' : 'We will get back to you shortly',
-        eyebrow: isBooking ? 'Booking request received' : 'Message received',
+        preheader: isStay ? 'We are checking availability for your dates' : isActivity ? 'We are arranging the details' : 'We will get back to you shortly',
+        eyebrow: isStay ? 'Booking request received' : isActivity ? 'Experience request received' : 'Message received',
         title,
-        intro: isBooking
-          ? `<p>Dear ${esc(firstName(e.name))},</p><p>Thank you for choosing The Pinus Resort. We have received your booking request and are checking availability for your dates. We will call or WhatsApp you on <b>${esc(e.phone)}</b> shortly. Once the booking is confirmed, you will receive a confirmation email from us.</p>`
-          : `<p>Dear ${esc(firstName(e.name))},</p><p>Thank you for writing to The Pinus Resort. We will reply on <b>${esc(e.phone)}</b> or by email shortly.</p>`,
+        intro,
         rows,
         button: { href: `https://wa.me/${site.whatsapp}?text=${encodeURIComponent(`Hello, my request reference is ${e.ref}.`)}`, label: 'Chat on WhatsApp' },
       }),
-      text: textOf(title, rows, 'This is a request, not yet a confirmed booking.'),
+      text: textOf(title, rows, isStay || isActivity ? 'This is a request, not yet confirmed.' : ''),
     }));
   }
   await Promise.all(jobs);
+}
+
+/* ---------- Experience confirmed by the hotel ---------- */
+export async function sendActivityConfirmation(e) {
+  const admins = await adminRecipients();
+  const c = e.confirmed || {};
+  const rows = [
+    ['Reference', e.ref],
+    ...activityRows({ ...e, check_in: c.date || e.check_in, slot: c.time || e.slot, adults: c.adults ?? e.adults, children: c.children ?? e.children }),
+    ['Meeting point', c.meeting],
+    ['Price', c.amount_minor != null ? inr(c.amount_minor) : ''],
+    ['From the team', c.note],
+  ];
+  const jobs = [
+    send({
+      kind: 'activity_confirm_admin', to: admins, enquiryId: e.id,
+      subject: `Experience confirmed ${e.ref}: ${e.activity_name}, ${e.name}`,
+      html: layout({ eyebrow: 'Experience confirmed', title: e.name, intro: `<p>${esc(e.activity_name)} is confirmed.${e.email ? ' The guest has been emailed.' : ''}</p>`, rows: [...rows, ['Phone', e.phone]] }),
+      text: textOf(`Experience confirmed: ${e.activity_name}`, rows),
+    }),
+  ];
+  if (e.email) {
+    jobs.push(send({
+      kind: 'activity_confirm_guest', to: e.email, replyTo: admins[0], enquiryId: e.id,
+      subject: `${e.activity_name} is confirmed (${e.ref}) | The Pinus Resort`,
+      html: layout({
+        preheader: `${niceDate(c.date || e.check_in)}${c.time || e.slot ? `, ${c.time || e.slot}` : ''}`,
+        eyebrow: 'Experience confirmed',
+        title: `It's all set, ${firstName(e.name)}`,
+        intro: `<p>Dear ${esc(firstName(e.name))},</p><p>Your <b>${esc(e.activity_name)}</b> is confirmed. Here are the details. If anything changes, just message us on WhatsApp.</p>`,
+        rows,
+        button: { href: `https://wa.me/${site.whatsapp}?text=${encodeURIComponent(`Hello, this is ${e.name} (${e.ref}).`)}`, label: 'Message us' },
+      }),
+      text: textOf(`${e.activity_name} is confirmed`, rows),
+    }));
+  }
+  return Promise.all(jobs);
 }
 
 /* ---------- 2. Booking confirmed ---------- */

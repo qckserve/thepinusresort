@@ -226,3 +226,35 @@ test('changing your own password signs out your other devices only', async () =>
   await call('PATCH', `/admin/staff/${mona.id}`, { isActive: false });
   assert.equal((await call('GET', '/admin/me', null, a)).status, 401);
 });
+
+test('experience booking: request, validation, confirm, emails and Today', async () => {
+  const bad = await call('POST', '/enquiries', { kind: 'activity', activity: 'skydiving', date: day(2), adults: 2, name: 'Zara Khan', phone: '+91 99000 11122', email: 'zara@example.com' }, '');
+  assert.equal(bad.status, 422);
+  assert.ok(bad.body.fields.activity);
+  const tooMany = await call('POST', '/enquiries', { kind: 'activity', activity: 'fishing', date: day(2), adults: 25, name: 'Zara Khan', phone: '+91 99000 11122', email: 'zara@example.com' }, '');
+  assert.equal(tooMany.status, 422, 'fishing takes at most 10');
+  const req = await call('POST', '/enquiries', { kind: 'activity', activity: 'fishing', date: day(1), slot: 'Morning', adults: 2, children: 1, stayRef: 'tpr-abc123', name: 'Zara Khan', phone: '+91 99000 11122', email: 'zara@example.com', message: 'First time fishing' }, '');
+  assert.equal(req.status, 201, JSON.stringify(req.body));
+  await new Promise((r) => setTimeout(r, 300));
+  const leads = await call('GET', '/admin/enquiries?kind=activity');
+  const lead = leads.body.items.find((l) => l.ref === req.body.ref);
+  assert.equal(lead.activity_name, 'Trout fishing on the Lidder');
+  assert.equal(lead.slot, 'Morning');
+  assert.equal(lead.stay_ref, 'TPR-ABC123');
+  assert.ok(leads.body.items.every((l) => l.kind === 'activity'), 'type filter works');
+  const files = readdirSync(mails).join(' ');
+  assert.ok(files.includes('New-experience-request'), 'admin alerted');
+  assert.ok(files.includes('We-have-your-experience-request'), 'guest acknowledged');
+  const conf = await call('POST', `/admin/enquiries/${lead.id}/confirm-activity`, { date: day(1), time: '7:00 am pick-up', adults: 2, children: 1, amount: 3500, meeting: 'Resort reception', note: 'Bring warm layers.' });
+  assert.equal(conf.status, 200, JSON.stringify(conf.body));
+  assert.equal(conf.body.item.status, 'booked');
+  assert.equal(conf.body.item.confirmed.amount_minor, 350000);
+  await new Promise((r) => setTimeout(r, 200));
+  const after = readdirSync(mails).join(' ');
+  assert.ok(after.includes('Trout-fishing-on-the-Lidder-is-confirmed'), 'guest confirmation email');
+  assert.ok(after.includes('Experience-confirmed'), 'admin copy');
+  const dash = await call('GET', '/admin/dashboard');
+  assert.ok(dash.body.experiences.some((x) => x.ref === req.body.ref), 'shows on Today');
+  const notActivity = (await call('GET', '/admin/enquiries?kind=booking')).body.items[0];
+  assert.equal((await call('POST', `/admin/enquiries/${notActivity.id}/confirm-activity`, {})).status, 409);
+});

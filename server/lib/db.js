@@ -179,8 +179,9 @@ export async function createEnquiry(data) {
   throw new Error('Could not create a unique reference');
 }
 
-export async function listEnquiries({ status, q, limit = 200 } = {}) {
+export async function listEnquiries({ status, kind, q, limit = 200 } = {}) {
   const filter = {};
+  if (['booking', 'activity', 'contact'].includes(kind)) filter.kind = kind;
   if (status && LEAD_STATUSES.includes(status)) filter.status = status;
   if (q) {
     const re = searchRe(q);
@@ -192,8 +193,9 @@ export async function listEnquiries({ status, q, limit = 200 } = {}) {
   return rows.map((r) => ({ ...pub(r), reservation_ref: refs.get(r.reservation_id) ?? null }));
 }
 
-export async function countByStatus() {
-  const rows = await col('enquiries').aggregate([{ $group: { _id: '$status', n: { $sum: 1 } } }]).toArray();
+export async function countByStatus(kind) {
+  const match = ['booking', 'activity', 'contact'].includes(kind) ? [{ $match: { kind } }] : [];
+  const rows = await col('enquiries').aggregate([...match, { $group: { _id: '$status', n: { $sum: 1 } } }]).toArray();
   return Object.fromEntries(LEAD_STATUSES.map((s) => [s, rows.find((r) => r._id === s)?.n || 0]));
 }
 
@@ -202,4 +204,25 @@ export async function updateEnquiry(id, { status, notes }) {
   if (status && LEAD_STATUSES.includes(status)) set.status = status;
   if (notes !== undefined) set.notes = String(notes).slice(0, 2000);
   return pub(await col('enquiries').findOneAndUpdate({ _id: id }, { $set: set }, { returnDocument: 'after' }));
+}
+
+/** Confirm an experience request: store the agreed details and mark the lead booked. */
+export async function confirmActivity(id, staffId, b) {
+  const e = await col('enquiries').findOne({ _id: id });
+  if (!e) throw new AppError('NOT_FOUND', 'Lead not found');
+  if (e.kind !== 'activity') throw new AppError('CONFLICT', 'This lead is not an experience request');
+  const date = String(b.date || e.check_in || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new AppError('VALIDATION_ERROR', 'Choose a date', { fields: { date: 'Choose a date' } });
+  const n = (v, min, max, d) => { const x = v === '' || v == null ? d : Number(v); if (!Number.isInteger(x) || x < min || x > max) throw new AppError('VALIDATION_ERROR', 'Check the number of people'); return x; };
+  const amount = b.amount === '' || b.amount == null ? null : Number(b.amount);
+  if (amount != null && (!Number.isFinite(amount) || amount < 0 || amount > 10_000_000)) throw new AppError('VALIDATION_ERROR', 'Price must be an amount in rupees');
+  const clip = (v, m) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, m) : null);
+  const confirmed = {
+    date, time: clip(b.time, 60) || e.slot, adults: n(b.adults, 1, 60, e.adults), children: n(b.children, 0, 40, e.children || 0),
+    amount_minor: amount == null ? null : Math.round(amount * 100), meeting: clip(b.meeting, 200), note: clip(b.note, 600),
+    at: nowIso(), by: staffId ?? null,
+  };
+  await col('enquiries').updateOne({ _id: id }, { $set: { status: 'booked', confirmed, updated_at: nowIso() } });
+  await audit(staffId, 'ACTIVITY_CONFIRM', `${e.ref} ${e.name}: ${e.activity_name} on ${date}${confirmed.time ? `, ${confirmed.time}` : ''}`);
+  return pub(await col('enquiries').findOne({ _id: id }));
 }
