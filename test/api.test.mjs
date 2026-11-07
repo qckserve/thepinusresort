@@ -258,3 +258,21 @@ test('experience booking: request, validation, confirm, emails and Today', async
   const notActivity = (await call('GET', '/admin/enquiries?kind=booking')).body.items[0];
   assert.equal((await call('POST', `/admin/enquiries/${notActivity.id}/confirm-activity`, {})).status, 409);
 });
+
+test('children: under 5 stay free, 5 and above pay the extra-bed rate', async () => {
+  const from = day(40);
+  const to = day(42);
+  await call('POST', '/admin/bulk', { from, to: day(41), roomTypeIds: [], ratePlanIds: [1], set: { price: 5000, extraChild: 600 } });
+  const base = await call('POST', '/admin/quote', { roomTypeId: 1, ratePlanId: 1, checkIn: from, checkOut: to, rooms: 1, adults: 2 });
+  assert.equal(base.body.amount, 10000);
+  const withKids = await call('POST', '/admin/quote', { roomTypeId: 1, ratePlanId: 1, checkIn: from, checkOut: to, rooms: 1, adults: 2, children: 1, infants: 2 });
+  assert.equal(withKids.body.ok, true, JSON.stringify(withKids.body));
+  assert.equal(withKids.body.amount, 11200, 'one extra bed x 2 nights; under-5s free');
+  const tooMany = await call('POST', '/admin/quote', { roomTypeId: 1, ratePlanId: 1, checkIn: from, checkOut: to, rooms: 1, adults: 2, children: 2 });
+  assert.equal(tooMany.body.ok, false, 'Deluxe Room has 1 extra bed');
+  assert.match(tooMany.body.reasons[0], /extra bed/);
+  const lead = await call('POST', '/enquiries', { kind: 'booking', name: 'Family Test', phone: '+91 98765 43210', email: 'family@example.com', checkIn: from, checkOut: to, adults: 2, children: 1, infants: 2, rooms: 1 }, '');
+  assert.equal(lead.status, 201);
+  const row = (await call('GET', '/admin/enquiries?q=Family')).body.items[0];
+  assert.equal(row.infants, 2);
+});

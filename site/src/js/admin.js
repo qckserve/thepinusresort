@@ -189,14 +189,14 @@ const refresh = () => go(view);
 
 /* ---------- Shared bits ---------- */
 const pill = (s, map = ST) => `<span class="pill pill--${esc(s)}">${esc(map[s] || s)}</span>`;
-const guests = (a, c) => `${a} adult${a > 1 ? 's' : ''}${c ? `, ${c} child${c > 1 ? 'ren' : ''}` : ''}`;
+const guests = (a, c, i) => `${a} adult${a > 1 ? 's' : ''}${c ? `, ${c} child${c > 1 ? 'ren' : ''}${i != null ? ' (5+)' : ''}` : ''}${i ? `, ${i} under 5` : ''}`;
 function bookingRow(r) {
   return `<button type="button" class="row" data-s="${r.status}" data-open-res="${r.id}">
     <div class="row__top"><span><span class="row__name">${esc(r.guest_name)}</span> <span class="meta">${esc(r.reference)} &middot; ${esc(SRC[r.source] || r.source)}</span></span>${pill(r.status)}</div>
     <dl class="facts-g">
       <div><dt>Stay</dt><dd>${dt(r.check_in)} to ${dt(r.check_out)} (${nights(r.check_in, r.check_out)}N)</dd></div>
       <div><dt>Room</dt><dd>${r.rooms} x ${esc(r.room_name)}</dd></div>
-      <div><dt>Guests</dt><dd>${guests(r.adults, r.children)}</dd></div>
+      <div><dt>Guests</dt><dd>${guests(r.adults, r.children, r.infants ?? null)}</dd></div>
       <div><dt>Amount</dt><dd>${inr(r.amount_minor) || '&ndash;'}${r.advance_minor ? ` <span class="meta">(adv ${inr(r.advance_minor)})</span>` : ''}</dd></div>
     </dl>
   </button>`;
@@ -312,7 +312,7 @@ function leadRow(l) {
     <dl class="facts-g">
       <div><dt>Phone</dt><dd><a class="lnk" href="tel:${esc(l.phone)}">${esc(l.phone)}</a></dd></div>
       ${l.email ? `<div><dt>Email</dt><dd><a class="lnk" href="mailto:${esc(l.email)}">${esc(l.email)}</a></dd></div>` : ''}
-      ${booking ? `<div><dt>Stay</dt><dd>${dt(l.check_in)} to ${dt(l.check_out)} (${nights(l.check_in, l.check_out)}N)</dd></div><div><dt>Guests</dt><dd>${guests(l.adults, l.children)}, ${l.rooms} room${l.rooms > 1 ? 's' : ''}</dd></div>` : ''}
+      ${booking ? `<div><dt>Stay</dt><dd>${dt(l.check_in)} to ${dt(l.check_out)} (${nights(l.check_in, l.check_out)}N)</dd></div><div><dt>Guests</dt><dd>${guests(l.adults, l.children, l.infants ?? null)}, ${l.rooms} room${l.rooms > 1 ? 's' : ''}</dd></div>` : ''}
       ${activity ? `<div><dt>Experience</dt><dd>${esc(l.activity_name)}</dd></div><div><dt>Date</dt><dd>${dty(l.check_in)}${l.slot ? `, ${esc(l.slot)}` : ''}</dd></div><div><dt>People</dt><dd>${guests(l.adults, l.children)}</dd></div>${l.stay_ref ? `<div><dt>Staying with us</dt><dd>${esc(l.stay_ref)}</dd></div>` : ''}` : ''}
     </dl>
     ${activity && c ? `<p class="note-box ok">Confirmed for ${dty(c.date)}${c.time ? `, ${esc(c.time)}` : ''}, ${guests(c.adults, c.children)}${c.amount_minor != null ? `, ${inr(c.amount_minor)}` : ''}${c.meeting ? `. Meet: ${esc(c.meeting)}` : ''}</p>` : ''}
@@ -346,8 +346,8 @@ function bookingForm({ lead }) {
   const rt = setup.roomTypes.find((r) => r.isActive) || {};
   const today = iso(new Date());
   const v = lead
-    ? { checkIn: lead.check_in, checkOut: lead.check_out, adults: lead.adults, children: lead.children || 0, rooms: lead.rooms, guestName: lead.name, guestPhone: lead.phone, guestEmail: lead.email || '', notes: lead.message || '', source: 'WEBSITE' }
-    : { checkIn: today, checkOut: addDays(today, 1), adults: 2, children: 0, rooms: 1, guestName: '', guestPhone: '', guestEmail: '', notes: '', source: 'PHONE' };
+    ? { checkIn: lead.check_in, checkOut: lead.check_out, adults: lead.adults, children: lead.children || 0, infants: lead.infants || 0, rooms: lead.rooms, guestName: lead.name, guestPhone: lead.phone, guestEmail: lead.email || '', notes: lead.message || '', source: 'WEBSITE' }
+    : { checkIn: today, checkOut: addDays(today, 1), adults: 2, children: 0, infants: 0, rooms: 1, guestName: '', guestPhone: '', guestEmail: '', notes: '', source: 'PHONE' };
   openDialog(`${dlgHead(lead ? `Confirm booking for ${esc(lead.name)}` : 'New booking')}
     <form data-bf novalidate>
       <div class="dlg__body">
@@ -361,7 +361,10 @@ function bookingForm({ lead }) {
         <div class="fgrid fgrid--3">
           <label class="f"><span>Rooms</span><input class="inp" type="number" name="rooms" min="1" max="20" value="${v.rooms}"></label>
           <label class="f"><span>Adults</span><input class="inp" type="number" name="adults" min="1" max="60" value="${v.adults}"></label>
-          <label class="f"><span>Children</span><input class="inp" type="number" name="children" min="0" max="40" value="${v.children}"></label>
+          <label class="f"><span>Children 5+ <small class="hint">(extra bed)</small></span><input class="inp" type="number" name="children" min="0" max="40" value="${v.children}"></label>
+        </div>
+        <div class="fgrid fgrid--3">
+          <label class="f"><span>Under 5 <small class="hint">(free)</small></span><input class="inp" type="number" name="infants" min="0" max="20" value="${v.infants}"></label>
         </div>
         <div class="note-box" data-quote>Checking availability...</div>
         <div class="fgrid">
@@ -386,13 +389,13 @@ function bookingForm({ lead }) {
     async function quote() {
       const box = $('[data-quote]', f);
       try {
-        const q = await api('POST', '/quote', { roomTypeId: f.roomTypeId.value, ratePlanId: f.ratePlanId.value, checkIn: f.checkIn.value, checkOut: f.checkOut.value, rooms: f.rooms.value, adults: f.adults.value, children: f.children.value });
+        const q = await api('POST', '/quote', { roomTypeId: f.roomTypeId.value, ratePlanId: f.ratePlanId.value, checkIn: f.checkIn.value, checkOut: f.checkOut.value, rooms: f.rooms.value, adults: f.adults.value, children: f.children.value, infants: f.infants.value });
         box.className = `note-box ${q.ok ? 'ok' : 'bad'}`;
         box.textContent = q.ok ? `Available. ${q.nights} night${q.nights > 1 ? 's' : ''}${q.amount != null ? `, INR ${q.amount.toLocaleString('en-IN')} from your rates` : ', no rate set for some nights (enter the amount)'}.` : q.reasons.join('. ');
         $('[data-amount]', f).placeholder = q.amount != null ? `${q.amount} from rates` : 'Enter the agreed total';
       } catch (x) { box.className = 'note-box bad'; box.textContent = x.message; }
     }
-    f.addEventListener('input', (e) => { if (['roomTypeId', 'ratePlanId', 'checkIn', 'checkOut', 'rooms', 'adults', 'children'].includes(e.target.name)) { clearTimeout(qt); qt = setTimeout(quote, 250); } });
+    f.addEventListener('input', (e) => { if (['roomTypeId', 'ratePlanId', 'checkIn', 'checkOut', 'rooms', 'adults', 'children', 'infants'].includes(e.target.name)) { clearTimeout(qt); qt = setTimeout(quote, 250); } });
     quote();
     f.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -490,7 +493,7 @@ async function bookingDialog(id) {
         <div><dt>Check in</dt><dd>${dty(r.check_in)}</dd></div>
         <div><dt>Check out</dt><dd>${dty(r.check_out)} (${nights(r.check_in, r.check_out)}N)</dd></div>
         <div><dt>Room</dt><dd>${r.rooms} x ${esc(r.room_name)}${r.rate_plan_name ? `, ${esc(r.rate_plan_name)}` : ''}</dd></div>
-        <div><dt>Guests</dt><dd>${guests(r.adults, r.children)}</dd></div>
+        <div><dt>Guests</dt><dd>${guests(r.adults, r.children, r.infants ?? null)}</dd></div>
       </dl>
       ${next.length ? `<div class="row__actions">${next.map((s) => `<button class="b ${s === 'CHECKED_IN' || s === 'CHECKED_OUT' ? 'b--primary' : 'b--danger'}" type="button" data-to="${s}">${btnLabel[s]}</button>`).join('')}</div>` : ''}
       <form data-edit class="fgrid">
@@ -588,7 +591,7 @@ function bulkDialog(one) {
           <label class="f"><span>Minimum stay (nights)</span><input class="inp" type="number" name="minLos" min="1" max="30" placeholder="${one ? `Now ${pDay?.minLos ?? 1}` : 'No change'}"></label>
           <label class="f"><span>Maximum stay (nights)</span><input class="inp" type="number" name="maxLos" min="0" max="30" placeholder="${one ? `Now ${pDay?.maxLos ?? 'none'}` : 'No change'} (0 = none)"></label>
           <label class="f"><span>Extra adult per night (INR)</span><input class="inp" type="number" name="extraAdult" min="0" placeholder="${one ? `Now ${pDay?.extraAdult ?? 0}` : 'No change'}"></label>
-          <label class="f"><span>Extra child per night (INR)</span><input class="inp" type="number" name="extraChild" min="0" placeholder="${one ? `Now ${pDay?.extraChild ?? 0}` : 'No change'}"></label>
+          <label class="f"><span>Extra bed, child 5+ (INR per night)</span><input class="inp" type="number" name="extraChild" min="0" placeholder="${one ? `Now ${pDay?.extraChild ?? 0}` : 'No change'}"></label>
           ${triSel('cta', 'Closed to arrival', pDay?.cta)}
           ${triSel('ctd', 'Closed to departure', pDay?.ctd)}
         </div>
@@ -631,7 +634,7 @@ RENDER.rooms = async () => {
       <section class="card-w">
         <h2><span>${esc(rt.name)} <span class="meta">${esc(rt.code)}${rt.isActive ? '' : ' &middot; hidden'}</span></span>${edit ? `<button class="b b--sm" data-rt-edit="${rt.id}">Edit</button>` : ''}</h2>
         <div class="pad">
-          <dl class="facts-g"><div><dt>Rooms</dt><dd><b style="font-size:1.3rem;font-family:var(--serif)">${rt.totalRooms}</b></dd></div><div><dt>Base occupancy</dt><dd>${rt.baseOccupancy}</dd></div><div><dt>Max adults / children</dt><dd>${rt.maxAdults} / ${rt.maxChildren}</dd></div><div><dt>Max guests</dt><dd>${rt.maxOccupancy}</dd></div></dl>
+          <dl class="facts-g"><div><dt>Rooms</dt><dd><b style="font-size:1.3rem;font-family:var(--serif)">${rt.totalRooms}</b></dd></div><div><dt>Base occupancy</dt><dd>${rt.baseOccupancy}</dd></div><div><dt>Max adults / extra beds</dt><dd>${rt.maxAdults} / ${rt.maxChildren}</dd></div><div><dt>Max guests</dt><dd>${rt.maxOccupancy}</dd></div></dl>
           <div class="tbl-wrap mt-s"><table class="tbl"><thead><tr><th>Rate plan</th><th>Meals</th><th>Pricing</th><th></th></tr></thead><tbody>
             ${rt.ratePlans.map((p) => `<tr><td>${esc(p.name)}${p.isDefault ? ' <span class="pill">Default</span>' : ''}${p.isActive ? '' : ' <span class="pill">Off</span>'}</td><td>${esc(setup.mealPlans[p.mealPlan])}</td><td>${p.rateMode === 'DERIVED' ? `${esc(p.parentName)} ${p.deriveValue >= 0 ? '+' : ''}${p.deriveType === 'PERCENT' ? `${p.deriveValue}%` : `INR ${p.deriveValue}`}${p.followParentRestrictions ? ', same restrictions' : ''}` : 'Set in the calendar'}</td><td>${edit ? `<button class="b b--sm" data-rp-edit="${p.id}">Edit</button>` : ''}</td></tr>`).join('')}
           </tbody></table></div>
@@ -670,7 +673,7 @@ function roomTypeDialog(rt) {
       <label class="f"><span>Number of rooms</span><input class="inp" type="number" name="totalRooms" min="0" max="200" value="${v.totalRooms}"><small class="hint">Changing this shifts every future night by the difference.</small></label>
       <label class="f"><span>Base occupancy <small class="hint">(included in the price)</small></span><input class="inp" type="number" name="baseOccupancy" min="1" value="${v.baseOccupancy}"></label>
       <label class="f"><span>Max adults per room</span><input class="inp" type="number" name="maxAdults" min="1" value="${v.maxAdults}"></label>
-      <label class="f"><span>Max children per room</span><input class="inp" type="number" name="maxChildren" min="0" value="${v.maxChildren}"></label>
+      <label class="f"><span>Extra beds per room <small class="hint">(children 5+)</small></span><input class="inp" type="number" name="maxChildren" min="0" value="${v.maxChildren}"></label>
       <label class="f"><span>Max guests per room</span><input class="inp" type="number" name="maxOccupancy" min="1" value="${v.maxOccupancy}"></label>
       <label class="f"><span>Display order</span><input class="inp" type="number" name="sortOrder" min="0" value="${v.sortOrder}"></label>
       <label class="check full"><input type="checkbox" name="isActive" ${v.isActive ? 'checked' : ''}> On sale</label>

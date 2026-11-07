@@ -113,7 +113,7 @@ function roomTypeFields(b, existing) {
     total_rooms: int(b.totalRooms ?? existing?.total_rooms ?? 0, 0, 200, 'Total rooms'),
     base_occupancy: int(b.baseOccupancy ?? existing?.base_occupancy ?? 2, 1, 20, 'Base occupancy'),
     max_adults: int(b.maxAdults ?? existing?.max_adults ?? 2, 1, 20, 'Max adults'),
-    max_children: int(b.maxChildren ?? existing?.max_children ?? 0, 0, 20, 'Max children'),
+    max_children: int(b.maxChildren ?? existing?.max_children ?? 0, 0, 20, 'Extra beds per room'),
     max_occupancy: int(b.maxOccupancy ?? existing?.max_occupancy ?? 2, 1, 40, 'Max guests'),
     sort_order: int(b.sortOrder ?? existing?.sort_order ?? 0, 0, 999, 'Order'),
     is_active: b.isActive === undefined ? (existing ? !!existing.is_active : true) : !!b.isActive,
@@ -422,7 +422,8 @@ export function bulkUpdate(staffId, b) {
  * plan's restrictions apply; staff booking a walk-in only need capacity (as in the original extranet).
  * Pass a session to read inside a transaction.
  */
-export async function checkStay({ roomTypeId, ratePlanId, checkIn, checkOut, rooms = 1, adults = 2, children = 0, channel = false }, session) {
+// children = aged 5 and above (each needs an extra bed, charged per night); infants = under 5 (free, no bed).
+export async function checkStay({ roomTypeId, ratePlanId, checkIn, checkOut, rooms = 1, adults = 2, children = 0, infants = 0, channel = false }, session) {
   const rt = await col('room_types').findOne({ _id: roomTypeId, is_active: true }, { session });
   if (!rt) throw new AppError('NOT_FOUND', 'Room type not found');
   const plan = ratePlanId
@@ -431,7 +432,7 @@ export async function checkStay({ roomTypeId, ratePlanId, checkIn, checkOut, roo
   const nights = stayNights(checkIn, checkOut);
   const reasons = [];
   if (adults > rt.max_adults * rooms || children > rt.max_children * rooms || adults + children > rt.max_occupancy * rooms) {
-    reasons.push(`${rt.name} takes up to ${rt.max_adults} adults and ${rt.max_children} children per room`);
+    reasons.push(`${rt.name} takes up to ${rt.max_adults} adults and ${rt.max_children} extra bed${rt.max_children === 1 ? '' : 's'} (children 5 and above) per room`);
   }
   const inv = await col('daily_inventory').find({ room_type_id: roomTypeId, stay_date: { $gte: checkIn, $lt: checkOut } }, { session }).toArray();
   const byDate = new Map(inv.map((r) => [r.stay_date, r]));
@@ -453,14 +454,14 @@ export async function checkStay({ roomTypeId, ratePlanId, checkIn, checkOut, roo
   let amount = null;
   if (rates.length === nights.length && rates.every((r) => r.price_minor)) {
     const extraAdults = Math.max(0, adults - rt.base_occupancy * rooms);
-    const extraKids = Math.max(0, Math.min(children, adults + children - rt.base_occupancy * rooms));
+    const extraKids = children; // every child 5+ takes an extra bed; under-5s are free
     amount = rates.reduce((sum, r) => sum + r.price_minor * rooms + r.extra_adult_minor * extraAdults + r.extra_child_minor * extraKids, 0);
   }
   return { ok: reasons.length === 0, reasons, roomType: rt, ratePlan: plan, nights: nights.length, amountMinor: amount };
 }
 
 /** Website availability: which room types can take this stay. No prices are shown publicly. */
-export async function publicAvailability({ checkIn, checkOut, rooms, adults, children }) {
+export async function publicAvailability({ checkIn, checkOut, rooms, adults, children, infants = 0 }) {
   const types = await col('room_types').find({ is_active: true, total_rooms: { $gt: 0 } }).sort({ sort_order: 1, name: 1 }).toArray();
   if (!types.length) return { configured: false, available: null, roomTypes: [] };
   const out = [];

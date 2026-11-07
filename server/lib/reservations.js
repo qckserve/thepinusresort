@@ -32,7 +32,7 @@ function parse(b) {
     roomTypeId: Number(b.roomTypeId),
     ratePlanId: b.ratePlanId ? Number(b.ratePlanId) : null,
     checkIn: b.checkIn, checkOut: b.checkOut,
-    rooms: Number(b.rooms ?? 1), adults: Number(b.adults ?? 2), children: Number(b.children ?? 0),
+    rooms: Number(b.rooms ?? 1), adults: Number(b.adults ?? 2), children: Number(b.children ?? 0), infants: Number(b.infants ?? 0),
     source: SOURCES.includes(b.source) ? b.source : null,
     sourceDetail: str(b.sourceDetail, 120) || null,
     guestName: str(b.guestName, 120),
@@ -52,6 +52,7 @@ function parse(b) {
   if (!Number.isInteger(r.rooms) || r.rooms < 1 || r.rooms > 20) errors.rooms = '1 to 20 rooms';
   if (!Number.isInteger(r.adults) || r.adults < 1 || r.adults > 60) errors.adults = '1 to 60 adults';
   if (!Number.isInteger(r.children) || r.children < 0 || r.children > 40) errors.children = '0 to 40 children';
+  if (!Number.isInteger(r.infants) || r.infants < 0 || r.infants > 20) errors.infants = '0 to 20 children under 5';
   if (!r.source) errors.source = 'Choose where the booking came from';
   if (r.guestName.length < 2) errors.guestName = 'Guest name is needed';
   if (r.guestPhone && !/^\+?[0-9 ()-]{8,20}$/.test(r.guestPhone)) errors.guestPhone = 'Check the phone number';
@@ -98,7 +99,7 @@ export async function createReservation(staffId, body) {
     const now = nowIso();
     await col('reservations').insertOne({
       _id: newId, reference, enquiry_id: enquiryId, room_type_id: r.roomTypeId, rate_plan_id: check.ratePlan?._id ?? null,
-      source: r.source, source_detail: r.sourceDetail, check_in: r.checkIn, check_out: r.checkOut, rooms: r.rooms, adults: r.adults, children: r.children,
+      source: r.source, source_detail: r.sourceDetail, check_in: r.checkIn, check_out: r.checkOut, rooms: r.rooms, adults: r.adults, children: r.children, infants: r.infants,
       guest_name: r.guestName, guest_phone: r.guestPhone, guest_email: r.guestEmail,
       amount_minor: r.amountMinor ?? check.amountMinor, advance_minor: r.advanceMinor, notes: r.notes,
       status: 'CONFIRMED', released_from: null, review_token: randomBytes(18).toString('base64url'),

@@ -98,7 +98,7 @@ function stayRows(r, s, { money = true } = {}) {
     ['Check out', `${niceDate(r.check_out)}${s.checkout_time ? `, by ${time12(s.checkout_time)}` : ''}`],
     ['Nights', String(n)],
     ['Room', `${r.rooms} x ${r.room_name}${r.meal_plan ? ` (${MEAL_PLANS[r.meal_plan] || r.meal_plan})` : ''}`],
-    ['Guests', `${r.adults} adult${r.adults > 1 ? 's' : ''}${r.children ? `, ${r.children} child${r.children > 1 ? 'ren' : ''}` : ''}`],
+    ['Guests', people(r.adults, r.children, r.infants ?? null)],
     ...(money ? [['Total', inr(r.amount_minor)], ['Advance received', inr(r.advance_minor)], ['Balance', r.amount_minor != null && r.advance_minor != null ? inr(r.amount_minor - r.advance_minor) : '']] : []),
   ];
 }
@@ -111,7 +111,7 @@ async function loadRes(id) {
 const firstName = (n) => String(n).split(' ')[0];
 
 /* ---------- 1. Booking request received (website lead) ---------- */
-const people = (a, c) => `${a} adult${a > 1 ? 's' : ''}${c ? `, ${c} child${c > 1 ? 'ren' : ''}` : ''}`;
+const people = (a, c, i) => `${a} adult${a > 1 ? 's' : ''}${c ? `, ${c} child${c > 1 ? 'ren' : ''}${i != null ? ' (5+)' : ''}` : ''}${i ? `, ${i} under 5` : ''}`;
 function activityRows(e) {
   return [
     ['Experience', e.activity_name],
@@ -136,7 +136,7 @@ export async function sendLeadEmails(e) {
       ? [
           ['Check in', niceDate(e.check_in)],
           ['Check out', `${niceDate(e.check_out)} (${daysBetween(e.check_in, e.check_out)} nights)`],
-          ['Guests', people(e.adults, e.children)],
+          ['Guests', people(e.adults, e.children, e.infants ?? null)],
           ['Rooms', `${e.rooms} x ${e.room_type}`],
         ]
       : []),

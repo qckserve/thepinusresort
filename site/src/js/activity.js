@@ -87,7 +87,7 @@ modal.innerHTML = `
         <div class="full form-status is-error" role="alert" data-bk-status hidden></div>
         <div class="full btn-row">
           <button class="btn" type="submit" data-bk-submit>Request this experience</button>
-          <p class="form-note">No payment now. We confirm the plan and price by call or WhatsApp.</p>
+          <p class="form-note">No payment on this form. We confirm the plan and price by call or WhatsApp, then you can pay online.</p>
         </div>
       </form>
     </div>

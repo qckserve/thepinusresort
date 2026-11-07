@@ -15,7 +15,7 @@ function bookingText(d, ref) {
   if (ref) lines.push(`Reference: ${ref}`);
   if (d.checkIn) lines.push(`Check in: ${nice(d.checkIn)}`);
   if (d.checkOut) lines.push(`Check out: ${nice(d.checkOut)}`);
-  if (d.adults) lines.push(`Guests: ${plural(+d.adults, 'adult', 'adults')}${+d.children ? `, ${plural(+d.children, 'child', 'children')}` : ''}`);
+  if (d.adults) lines.push(`Guests: ${plural(+d.adults, 'adult', 'adults')}${+d.children ? `, ${plural(+d.children, 'child', 'children')} (5+)` : ''}${+d.infants ? `, ${d.infants} under 5` : ''}`);
   if (d.rooms) lines.push(`Rooms: ${d.rooms}${d.roomType && d.roomType !== 'Not sure yet' ? ` (${d.roomType})` : ''}`);
   if (d.name) lines.push(`Name: ${d.name}`);
   return lines.join('\n');
@@ -33,7 +33,7 @@ document.querySelectorAll('form[data-enquiry]').forEach((form) => {
     el.checkIn.min = iso(today);
     el.checkOut.min = iso(new Date(today.getTime() + 864e5));
     const params = new URLSearchParams(location.search);
-    const map = { checkin: 'checkIn', checkout: 'checkOut', adults: 'adults', children: 'children', rooms: 'rooms', room: 'roomType' };
+    const map = { checkin: 'checkIn', checkout: 'checkOut', adults: 'adults', children: 'children', infants: 'infants', rooms: 'rooms', room: 'roomType' };
     for (const [q, name] of Object.entries(map)) {
       const v = params.get(q);
       if (v && el[name]) el[name].value = v;
@@ -68,7 +68,8 @@ document.querySelectorAll('form[data-enquiry]').forEach((form) => {
     sum('nights', n > 0 ? String(n) : '–');
     const a = +el.adults.value || 0;
     const c = +el.children.value || 0;
-    sum('guests', `${plural(a, 'adult', 'adults')}${c ? `, ${plural(c, 'child', 'children')}` : ''}`);
+    const i = +(el.infants?.value || 0);
+    sum('guests', `${plural(a, 'adult', 'adults')}${c ? `, ${plural(c, 'child', 'children')} (5+)` : ''}${i ? `, ${i} under 5` : ''}`);
     sum('rooms', `${el.rooms.value || 1}${el.roomType.value !== 'Not sure yet' ? ` · ${el.roomType.value}` : ''}`);
   }
   form.addEventListener('input', updateSummary);

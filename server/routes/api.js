@@ -69,7 +69,7 @@ api.get('/availability', limiter(60, 60 * 1000), h((req) => {
     throw new AppError('VALIDATION_ERROR', 'Choose valid dates');
   }
   const n = (v, d, max) => Math.min(max, Math.max(0, Number.parseInt(v, 10) || d));
-  return inv.publicAvailability({ checkIn, checkOut, rooms: Math.max(1, n(req.query.rooms, 1, 20)), adults: Math.max(1, n(req.query.adults, 2, 40)), children: n(req.query.children, 0, 20) });
+  return inv.publicAvailability({ checkIn, checkOut, rooms: Math.max(1, n(req.query.rooms, 1, 20)), adults: Math.max(1, n(req.query.adults, 2, 40)), children: n(req.query.children, 0, 20), infants: n(req.query.infants, 0, 10) });
 }));
 
 api.get('/review', limiter(30, 60 * 1000), h(async (req) => {
@@ -199,7 +199,7 @@ staff.post('/quote', desk, h(async (req) => {
   const b = req.body || {};
   if (!isIsoDate(b.checkIn) || !isIsoDate(b.checkOut) || b.checkOut <= b.checkIn) throw new AppError('VALIDATION_ERROR', 'Choose valid dates');
   const q = await inv.checkStay({ roomTypeId: num(b.roomTypeId), ratePlanId: b.ratePlanId ? num(b.ratePlanId) : null, checkIn: b.checkIn, checkOut: b.checkOut,
-    rooms: num(b.rooms || 1), adults: num(b.adults || 2), children: num(b.children || 0) });
+    rooms: num(b.rooms || 1), adults: num(b.adults || 2), children: num(b.children || 0), infants: num(b.infants || 0) });
   return { ok: q.ok, reasons: q.reasons, nights: q.nights, amount: q.amountMinor == null ? null : q.amountMinor / 100 };
 }));
 const markSent = (id, field) => col('reservations').updateOne({ _id: id }, { $set: { [field]: nowIso() } });

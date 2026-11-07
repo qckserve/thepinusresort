@@ -39,13 +39,15 @@ export function validateEnquiry(body = {}) {
     if (!isDate(checkOut)) errors.checkOut = 'Please choose your check-out date.';
     else if (isDate(checkIn) && checkOut <= checkIn) errors.checkOut = 'Check-out must be after check-in.';
     const adults = int(body.adults, 1, 40);
-    const children = int(body.children ?? 0, 0, 20);
+    const children = int(body.children ?? 0, 0, 20); // 5 and above: need an extra bed
+    const infants = int(body.infants ?? 0, 0, 10); // under 5: free, no extra bed
     const rooms = int(body.rooms, 1, 20);
     if (adults === null) errors.adults = 'Number of adults should be between 1 and 40.';
     if (children === null) errors.children = 'Number of children should be between 0 and 20.';
     if (rooms === null) errors.rooms = 'Number of rooms should be between 1 and 20.';
+    if (infants === null) errors.infants = 'Number of children under 5 should be between 0 and 10.';
     const roomType = ROOM_TYPES.includes(body.roomType) ? body.roomType : 'Not sure yet';
-    Object.assign(out, { check_in: checkIn, check_out: checkOut, adults, children, rooms, room_type: roomType });
+    Object.assign(out, { check_in: checkIn, check_out: checkOut, adults, children, infants, rooms, room_type: roomType });
   } else if (kind === 'activity') {
     const act = activityByCode(clean(body.activity, 40));
     const date = clean(body.date, 10);

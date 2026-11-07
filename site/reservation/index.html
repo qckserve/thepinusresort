@@ -55,13 +55,22 @@
               <span class="field__error" data-error="adults"></span>
             </div>
             <div class="field">
-              <label for="r-children">Children <span style="text-transform:none;letter-spacing:0">(under 12)</span></label>
+              <label for="r-children">Children <span style="text-transform:none;letter-spacing:0">(5 and above, extra bed)</span></label>
               <div class="stepper">
                 <button type="button" data-step="-1" aria-label="One child fewer"><svg class="icon"><use href="#i-minus"/></svg></button>
                 <input id="r-children" name="children" type="number" inputmode="numeric" min="0" max="20" value="0">
                 <button type="button" data-step="1" aria-label="One child more"><svg class="icon"><use href="#i-plus"/></svg></button>
               </div>
               <span class="field__error" data-error="children"></span>
+            </div>
+            <div class="field">
+              <label for="r-infants">Under 5 <span style="text-transform:none;letter-spacing:0">(stay free)</span></label>
+              <div class="stepper">
+                <button type="button" data-step="-1" aria-label="One child under 5 fewer"><svg class="icon"><use href="#i-minus"/></svg></button>
+                <input id="r-infants" name="infants" type="number" inputmode="numeric" min="0" max="10" value="0">
+                <button type="button" data-step="1" aria-label="One child under 5 more"><svg class="icon"><use href="#i-plus"/></svg></button>
+              </div>
+              <span class="field__error" data-error="infants"></span>
             </div>
             <div class="field">
               <label for="r-rooms">Rooms</label>
@@ -108,7 +117,7 @@
             <div class="full form-status" role="alert" data-status hidden></div>
             <div class="full btn-row">
               <button class="btn" type="submit" data-submit>Send enquiry</button>
-              <p class="form-note">No payment now. We confirm by call or WhatsApp.</p>
+              <p class="form-note">No payment on this form. Once we confirm your dates by call or WhatsApp, you can pay online.</p>
             </div>
           </form>
         </div>
@@ -126,7 +135,7 @@
             <ol class="steps mt-l" role="list">
               <li><span><b>Send your dates</b>It takes a minute and costs nothing.</span></li>
               <li><span><b>We get back to you</b>By phone or WhatsApp, with availability and the rate.</span></li>
-              <li><span><b>Confirm and relax</b>Once you confirm, your cottage is ready and waiting.</span></li>
+              <li><span><b>Pay online and relax</b>Confirm with an online payment and your cottage is ready and waiting.</span></li>
             </ol>
           </div>
           <div class="panel">
@@ -136,7 +145,9 @@
               <div><dt>Check out</dt><dd>By 12:00 noon</dd></div>
               <div><dt>Breakfast</dt><dd>Continental, Asian or buffet</dd></div>
               <div><dt>Parking</dt><dd>Free, on site</dd></div>
-              <div><dt>Children</dt><dd>Welcome; no extra beds or cots</dd></div>
+              <div><dt>Children</dt><dd>Under 5 free; 5 and above need an extra bed (charged)</dd></div>
+              <div><dt>Heating</dt><dd>In every room</dd></div>
+              <div><dt>Payment</dt><dd>Online, once confirmed</dd></div>
               <div><dt>Pets</dt><dd>Not allowed</dd></div>
             </dl>
           </div>
